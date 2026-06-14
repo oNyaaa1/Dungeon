@@ -1,8 +1,13 @@
-DeriveGamemode("sandbox")
+DeriveGamemode("base")
 GM.Name = "The Dark Drift"
 Dungeon = Dungeon or {}
 hook.Add("PlayerInitialSpawn", "SetCustomCollisions", function(ply) ply:SetCustomCollisionCheck(true) end)
-hook.Add("DoPlayerDeath", "DarkDriftPlayerDeath", function(victim, inflictor, attacker)
+hook.Add("PlayerSpawn", "SetCustomCollisions", function(ply)
+    ply:SetModel("models/player/breen.mdl")
+    ply:Give("confetti_gun")
+end)
+
+hook.Add("PlayerDeath", "DarkDriftPlayerDeath", function(victim, attacker, inflictor)
     if not IsValid(victim) then return end
     local ent = ents.Create("prop_ragdoll")
     if not IsValid(ent) then return end
@@ -11,6 +16,8 @@ hook.Add("DoPlayerDeath", "DarkDriftPlayerDeath", function(victim, inflictor, at
     ent:Spawn()
     ent:Activate()
     ent.Ragdoll = true
+    local death_Rag = victim:GetRagdollEntity()
+    if IsValid(death_Rag) then death_Rag:Remove() end
 end)
 
 hook.Add("OnNPCKilled", "DarkDriftNPCDeath", function(npc, attacker, inflictor)
