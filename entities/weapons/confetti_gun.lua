@@ -57,7 +57,12 @@ function SWEP:PrimaryAttack()
         util.Effect("Explosion", effectdata)
     end
 
-    if SERVER then tr.Entity:TakeDamage(100, pl, pl) end
+    if SERVER then
+        for k, target in pairs(ents.FindInSphere(tr.Entity:GetPos(), 50)) do
+            target:TakeDamage(100, pl, pl)
+        end
+    end
+
     self:SetNextPrimaryFire(CurTime() + 1)
 end
 
