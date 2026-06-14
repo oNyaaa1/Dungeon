@@ -13,20 +13,8 @@ local CFG = {
     WallOffset = 60, -- half tile
     NPCTypes = {
         {
-            class = "npc_zombie",
+            class = "npc_evil_ass_skeleton",
             weight = 40
-        },
-        {
-            class = "npc_fastzombie",
-            weight = 20
-        },
-        {
-            class = "npc_combine_s",
-            weight = 25
-        },
-        {
-            class = "npc_manhack",
-            weight = 15
         },
     },
     NPCPerRoom = {
