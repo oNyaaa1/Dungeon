@@ -1,24 +1,18 @@
 print("Dungeon Loaded")
 
 local CFG = {
-    TileSize   = 128,
+    TileSize   = 120,
     TraceAbove = 512,
     NumRooms   = 12,
-    RoomMin    = 3,
-    RoomMax    = 8,
+    RoomMin    = 5,
+    RoomMax    = 10,
     MapW       = 60,
     MapH       = 60,
     MaxPlayers = 32,
 
-    HeightLayers = { 0, 128, 256 },
-    RampStepH    = 32,
-
-    -- Wall is exactly 2 plates tall = 256u, plenty to block a player (~72u tall)
-    WallH     = 256,
-    PlateSize = 128,  -- metal_plate4x4 is 128u, so 2 stacks = 256u wall
-    RoofClearance = 32,  -- extra gap between top of wall and roof so player has headroom
-
-    WallOverlap = 2,
+    WallH      = 240,   -- 2 x 120u plates
+    PlateSize  = 120,
+    WallOffset = 60,    -- half tile
 
     NPCTypes = {
         { class = "npc_zombie",     weight = 40 },
@@ -31,9 +25,7 @@ local CFG = {
     NPCRespawnTime = 30,
 }
 
-local FLOOR_MODEL = "models/props_phx/construct/metal_plate4x4.mdl"
-local WALL_MODEL  = "models/props_phx/construct/metal_plate4x4.mdl"
-local ROOF_MODEL  = "models/props_phx/construct/metal_plate4x4.mdl"
+local PLATE_MODEL = "models/props_phx/construct/metal_plate4x4.mdl"
 
 Dungeon            = Dungeon or {}
 Dungeon.Entities   = Dungeon.Entities or {}
@@ -83,10 +75,10 @@ local function weightedRandom(items)
     return items[#items]
 end
 
-local function spawnProp(model, pos, ang)
+local function spawnProp(pos, ang)
     local ent = ents.Create("prop_physics")
     if not IsValid(ent) then return nil end
-    ent:SetModel(model)
+    ent:SetModel(PLATE_MODEL)
     ent:SetPos(pos)
     ent:SetAngles(ang)
     ent:Spawn()
@@ -99,14 +91,13 @@ end
 -- ── Layout ───────────────────────────────────────────────────────────────────
 
 function Dungeon.BuildLayout()
-    local rooms, tileSet, tileList, tileZ = {}, {}, {}, {}
+    local rooms, tileSet, tileList = {}, {}, {}
 
-    local function addTile(x, y, z)
+    local function addTile(x, y)
         local k = x..","..y
         if not tileSet[k] then
             tileSet[k] = true
-            tileZ[k]   = z or 0
-            table.insert(tileList, { x=x, y=y, z=z or 0 })
+            table.insert(tileList, { x=x, y=y })
         end
     end
 
@@ -123,158 +114,100 @@ function Dungeon.BuildLayout()
             for _, e in ipairs(rooms) do
                 if overlaps(r, e) then ok = false; break end
             end
-            if ok then
-                r.layer = CFG.HeightLayers[math.random(#CFG.HeightLayers)]
-                table.insert(rooms, r)
-                break
-            end
+            if ok then table.insert(rooms, r); break end
         end
     end
 
     for _, room in ipairs(rooms) do
         for tx = room.x, room.x + room.w - 1 do
             for ty = room.y, room.y + room.h - 1 do
-                addTile(tx, ty, room.layer)
+                addTile(tx, ty)
             end
         end
     end
 
+    -- 2-tile wide corridors
     for i = 1, #rooms - 1 do
-        local rA, rB = rooms[i], rooms[i+1]
-        local ax, ay = center(rA)
-        local bx, by = center(rB)
+        local ax, ay = center(rooms[i])
+        local bx, by = center(rooms[i+1])
         local cx, cy = ax, ay
-        local zA, zB = rA.layer, rB.layer
-        local total  = math.abs(bx-ax) + math.abs(by-ay)
-        local step   = 0
 
         while cx ~= bx do
-            step = step + 1
-            local frac = total > 0 and step/total or 0
-            local cz   = math.floor((zA+(zB-zA)*frac)/CFG.RampStepH)*CFG.RampStepH
-            addTile(cx, cy, cz)
+            addTile(cx, cy)
+            addTile(cx, cy + 1)
             cx = cx + (bx > cx and 1 or -1)
         end
         while cy ~= by do
-            step = step + 1
-            local frac = total > 0 and step/total or 0
-            local cz   = math.floor((zA+(zB-zA)*frac)/CFG.RampStepH)*CFG.RampStepH
-            addTile(cx, cy, cz)
+            addTile(cx, cy)
+            addTile(cx + 1, cy)
             cy = cy + (by > cy and 1 or -1)
         end
-        addTile(bx, by, zB)
+        addTile(bx, by)
+        addTile(bx + 1, by)
     end
 
     Dungeon.LastRooms = rooms
-    Dungeon.TileZ     = tileZ
-    return rooms, tileList, tileSet, tileZ
+    return rooms, tileList, tileSet
 end
 
 -- ── Floor ────────────────────────────────────────────────────────────────────
 
-local function spawnFloor(origin, tile)
-    local wx = origin.x + tile.x * CFG.TileSize
-    local wy = origin.y + tile.y * CFG.TileSize
-    local gz = groundZ(Vector(wx, wy, origin.z))
-    spawnProp(FLOOR_MODEL, Vector(wx, wy, gz + tile.z), Angle(0, 0, 0))
-end
-
--- ── Roof ─────────────────────────────────────────────────────────────────────
-
-local function spawnRoof(origin, tileList, tileZ)
+local function spawnFloors(origin, tileList)
     for _, tile in ipairs(tileList) do
         local wx = origin.x + tile.x * CFG.TileSize
         local wy = origin.y + tile.y * CFG.TileSize
         local gz = groundZ(Vector(wx, wy, origin.z))
-
-        -- Inner ceiling: sits inside the room giving the player headroom
-        -- Placed at floor + layer + WallH so the wall tops align with it
-        local innerZ = gz + tile.z + CFG.WallH
-        spawnProp(ROOF_MODEL, Vector(wx, wy, innerZ), Angle(0, 0, 0))
-
-        -- Outer roof: one plate above the inner ceiling to seal the top
-        -- so there's no gap when looking up from inside
-        local outerZ = innerZ + CFG.PlateSize
-        spawnProp(ROOF_MODEL, Vector(wx, wy, outerZ), Angle(0, 0, 0))
+        spawnProp(Vector(wx, wy, gz), Angle(0, 0, 0))
     end
 end
 
--- ── Stairs ───────────────────────────────────────────────────────────────────
+-- ── Roof ─────────────────────────────────────────────────────────────────────
 
-local function spawnStairs(origin, tileList, tileZ)
-    local placed = {}
-    local ADJ = { {dx=1,dy=0}, {dx=0,dy=1} }
-
+local function spawnRoofs(origin, tileList)
     for _, tile in ipairs(tileList) do
-        local k  = tile.x..","..tile.y
-        local zA = tileZ[k] or 0
-
-        for _, d in ipairs(ADJ) do
-            local nk = (tile.x+d.dx)..",".. (tile.y+d.dy)
-            local zB = tileZ[nk]
-            if not zB or zB == zA then continue end
-
-            local pk = math.min(tile.x,tile.x+d.dx)..","..math.min(tile.y,tile.y+d.dy)
-                       ..">"..math.max(tile.x,tile.x+d.dx)..","..math.max(tile.y,tile.y+d.dy)
-            if placed[pk] then continue end
-            placed[pk] = true
-
-            local steps = math.abs(zB - zA) / CFG.RampStepH
-            local dir   = zB > zA and 1 or -1
-            local yaw   = d.dx ~= 0 and 0 or 90
-
-            for s = 1, steps do
-                local frac  = s / steps
-                local stepX = origin.x + (tile.x + d.dx * frac) * CFG.TileSize
-                local stepY = origin.y + (tile.y + d.dy * frac) * CFG.TileSize
-                local gz    = groundZ(Vector(stepX, stepY, origin.z))
-                local stepZ = gz + zA + (s - 0.5) * CFG.RampStepH * dir
-                local pitch = dir * (90 / steps)
-                spawnProp(FLOOR_MODEL, Vector(stepX, stepY, stepZ), Angle(pitch, yaw, 0))
-            end
-        end
+        local wx = origin.x + tile.x * CFG.TileSize
+        local wy = origin.y + tile.y * CFG.TileSize
+        local gz = groundZ(Vector(wx, wy, origin.z))
+        -- Flat single level: roof = ground + WallH, one consistent height
+        spawnProp(Vector(wx, wy, gz + CFG.WallH), Angle(0, 0, 0))
     end
 end
 
 -- ── Walls ────────────────────────────────────────────────────────────────────
 
 local DIRS = {
-    { dx= 0, dy=-1, ox= 0,   oy=-0.5, yaw=  0, ex= 0, ey= 1 },
-    { dx= 0, dy= 1, ox= 0,   oy= 0.5, yaw=180, ex= 0, ey=-1 },
-    { dx= 1, dy= 0, ox= 0.5, oy= 0,   yaw= 90, ex=-1, ey= 0 },
-    { dx=-1, dy= 0, ox=-0.5, oy= 0,   yaw=270, ex= 1, ey= 0 },
+    { dx= 0, dy=-1, ox=0,              oy=-CFG.WallOffset, yaw=  0 },
+    { dx= 0, dy= 1, ox=0,              oy= CFG.WallOffset, yaw=180 },
+    { dx= 1, dy= 0, ox= CFG.WallOffset, oy=0,              yaw= 90 },
+    { dx=-1, dy= 0, ox=-CFG.WallOffset, oy=0,              yaw=270 },
 }
 
-local function spawnWalls(origin, tileSet, tileZ)
-    local stackCount = math.ceil(CFG.WallH / CFG.PlateSize)
-    local overlap    = CFG.WallOverlap
+local function spawnWalls(origin, tileSet)
+    local stackCount = math.ceil(CFG.WallH / CFG.PlateSize)  -- exactly 2
 
     for key in pairs(tileSet) do
         local tx, ty = key:match("(-?%d+),(-?%d+)")
         tx, ty = tonumber(tx), tonumber(ty)
 
-        local wx  = origin.x + tx * CFG.TileSize
-        local wy  = origin.y + ty * CFG.TileSize
-        local gz  = groundZ(Vector(wx, wy, origin.z))
-        local myZ = tileZ[key] or 0
+        local wx = origin.x + tx * CFG.TileSize
+        local wy = origin.y + ty * CFG.TileSize
+        local gz = groundZ(Vector(wx, wy, origin.z))
 
         for _, d in ipairs(DIRS) do
             if not tileSet[(tx+d.dx)..",".. (ty+d.dy)] then
-                local wallX = wx + d.ox * CFG.TileSize + d.ex * overlap
-                local wallY = wy + d.oy * CFG.TileSize + d.ey * overlap
+                local wallX = wx + d.ox
+                local wallY = wy + d.oy
 
                 for i = 1, stackCount do
-                    local wallZ = gz + myZ + (i - 0.5) * CFG.PlateSize
-                    spawnProp(WALL_MODEL,
-                        Vector(wallX, wallY, wallZ),
-                        Angle(0, d.yaw, 90))
+                    local wallZ = gz + (i - 0.5) * CFG.PlateSize
+                    spawnProp(Vector(wallX, wallY, wallZ), Angle(0, d.yaw, 90))
                 end
             end
         end
     end
 end
 
--- ── NPC Spawning ─────────────────────────────────────────────────────────────
+-- ── NPCs ─────────────────────────────────────────────────────────────────────
 
 local function spawnNPCsForRoom(origin, room)
     for _ = 1, math.random(CFG.NPCPerRoom.min, CFG.NPCPerRoom.max) do
@@ -287,7 +220,7 @@ local function spawnNPCsForRoom(origin, room)
 
         local npc = ents.Create(npcType.class)
         if not IsValid(npc) then continue end
-        npc:SetPos(Vector(wx, wy, gz + room.layer + 10))
+        npc:SetPos(Vector(wx, wy, gz + 10))
         npc:Spawn()
         npc:Activate()
         table.insert(Dungeon.NPCs, npc)
@@ -327,7 +260,7 @@ local function buildSpawnPoints(origin, rooms)
         local cx = origin.x + math.floor(r.x + r.w * 0.5) * CFG.TileSize
         local cy = origin.y + math.floor(r.y + r.h * 0.5) * CFG.TileSize
         local gz = groundZ(Vector(cx, cy, origin.z))
-        table.insert(Dungeon.SpawnPos, Vector(cx, cy, gz + r.layer + 10))
+        table.insert(Dungeon.SpawnPos, Vector(cx, cy, gz + 10))
     end
 end
 
@@ -363,12 +296,11 @@ function Dungeon:Generate(origin)
     origin         = origin or Vector(0, 0, 0)
     Dungeon.Origin = origin
 
-    local rooms, tiles, tileSet, tileZ = Dungeon.BuildLayout()
+    local rooms, tiles, tileSet = Dungeon.BuildLayout()
 
-    for _, t in ipairs(tiles) do spawnFloor(origin, t) end
-    spawnStairs(origin, tiles, tileZ)
-    spawnWalls(origin, tileSet, tileZ)
-    spawnRoof(origin, tiles, tileZ)
+    spawnFloors(origin, tiles)
+    spawnWalls(origin, tileSet)
+    spawnRoofs(origin, tiles)
     buildSpawnPoints(origin, rooms)
     Dungeon.SpawnAllNPCs(origin)
 
@@ -406,6 +338,12 @@ end)
 concommand.Add("dungeon_generate", function(ply)
     if not IsValid(ply) or ply:IsAdmin() then
         Dungeon:Generate(IsValid(ply) and ply:GetPos() or Vector(0,0,0))
+        -- Teleport caller straight to dungeon after generation
+        timer.Simple(0.1, function()
+            if IsValid(ply) then
+                ply:SetPos(Dungeon.GetSpawnPos())
+            end
+        end)
     end
 end)
 
