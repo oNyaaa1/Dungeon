@@ -12,10 +12,26 @@ local CFG = {
     PlateSize = 120,
     WallOffset = 60, -- half tile
     NPCTypes = {
-        { class = "npc_zombie",     weight = 40 },
-        { class = "npc_fastzombie", weight = 20 },
-        { class = "npc_combine_s",  weight = 25 },
-        { class = "npc_manhack",    weight = 15 },
+        {
+            class = "npc_zombie",
+            weight = 40
+        },
+        {
+            class = "npc_fastzombie",
+            weight = 20
+        },
+        {
+            class = "npc_combine_s",
+            weight = 25
+        },
+        {
+            class = "npc_manhack",
+            weight = 15
+        },
+    },
+    NPCPerRoom = {
+        min = 2,
+        max = 5
     },
     NPCRespawn = true,
     NPCRespawnTime = 30,
