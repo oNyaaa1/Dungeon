@@ -41,15 +41,23 @@ end
 function SWEP:PrimaryAttack()
     local pl = self:GetOwner()
     if not IsValid(pl) then return end
+    local tr = pl:GetEyeTrace()
     self:EmitSound("darkdrift/darkdrift_confetti.mp3")
     if CLIENT then
         local effects = EffectData()
         effects:SetOrigin(pl:GetShootPos())
         util.Effect("confetti", effects)
+        local effectdata = EffectData()
+        effectdata:SetOrigin(tr.HitPos)
+        effectdata:SetStart(tr.StartPos)
+        effectdata:SetSurfaceProp(tr.SurfaceProps) -- For the sound
+        effectdata:SetEntity(tr.Entity) -- The hit entity
+        effectdata:SetHitBox(tr.HitBoxBone or 0) -- For the decal
+        effectdata:SetDamageType(DMG_BULLET) -- For the decal
+        util.Effect("Explosion", effectdata)
     end
-    local tr = pl:GetEyeTrace()
-    if SERVER then tr.Entity:TakeDamage( 100, pl, pl ) end
 
+    if SERVER then tr.Entity:TakeDamage(100, pl, pl) end
     self:SetNextPrimaryFire(CurTime() + 1)
 end
 
