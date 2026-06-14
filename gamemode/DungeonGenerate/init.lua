@@ -91,7 +91,9 @@ local function spawnProp(pos, ang)
     ent:SetAngles(ang)
     ent:Spawn()
     ent:Activate()
+    ent:DrawShadow(false)
     freeze(ent)
+    ent.IsProp = true
     table.insert(Dungeon.Entities, ent)
     return ent
 end
@@ -257,6 +259,7 @@ local function spawnNPCsForRoom(origin, room)
         npc:SetPos(Vector(wx, wy, gz + 10))
         npc:Spawn()
         npc:Activate()
+        npc:DrawShadow(false)
         table.insert(Dungeon.NPCs, npc)
     end
 end
