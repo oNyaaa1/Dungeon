@@ -8,7 +8,7 @@ elseif CLIENT then
     SWEP.Slot = 4
     SWEP.SlotPos = 1
     SWEP.DrawAmmo = false
-    SWEP.DrawCrosshair = false
+    SWEP.DrawCrosshair = true
 end
 
 SWEP.Author = "oNyaaa"
@@ -47,6 +47,8 @@ function SWEP:PrimaryAttack()
         effects:SetOrigin(pl:GetShootPos())
         util.Effect("confetti", effects)
     end
+    local tr = pl:GetEyeTrace()
+    if SERVER then tr.Entity:TakeDamage( 100, pl, pl ) end
 
     self:SetNextPrimaryFire(CurTime() + 1)
 end
