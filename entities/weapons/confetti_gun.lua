@@ -41,6 +41,7 @@ end
 function SWEP:PrimaryAttack()
     local pl = self:GetOwner()
     if not IsValid(pl) then return end
+    if pl:Health() <= 0 then return end
     local tr = pl:GetEyeTrace()
     self:EmitSound("darkdrift/darkdrift_confetti.mp3")
     if CLIENT then

@@ -255,11 +255,12 @@ local function spawnNPCsForRoom(origin, room)
 
         function npc:OnKilled(damageInfo)
             hook.Run("OnNPCKilled", self, damageInfo:GetAttacker(), damageInfo:GetInflictor())
+            hook.Run("PlayerDeath", self, damageInfo:GetInflictor(),  damageInfo:GetAttacker())
             self:BecomeRagdoll(damageInfo)
         end
 
         function npc:HandleStuck()
-            //self.loco:ClearStuck()
+            --self.loco:ClearStuck()
             self:TeleportToRecoveryPos(spawnPos)
         end
 

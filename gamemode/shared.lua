@@ -5,9 +5,11 @@ hook.Add("PlayerInitialSpawn", "SetCustomCollisions", function(ply) ply:SetCusto
 hook.Add("PlayerSpawn", "SetCustomCollisions", function(ply)
     ply:SetModel("models/player/breen.mdl")
     ply:Give("confetti_gun")
+    ply:SetFrags(0)
 end)
 
-hook.Add("PlayerDeath", "DarkDriftPlayerDeath", function(victim, attacker, inflictor)
+hook.Add("PlayerDeath", "DarkDriftPlayerDeath", function(victim, inflictor, attacker)
+    if IsValid(attacker) then attacker:SetFrags(attacker:Frags() + 1) end
     if not IsValid(victim) then return end
     local ent = ents.Create("prop_ragdoll")
     if not IsValid(ent) then return end
