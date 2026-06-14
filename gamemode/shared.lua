@@ -2,7 +2,6 @@ DeriveGamemode("sandbox")
 GM.Name = "The Dark Drift"
 Dungeon = Dungeon or {}
 hook.Add("PlayerInitialSpawn", "SetCustomCollisions", function(ply) ply:SetCustomCollisionCheck(true) end)
--- DoPlayerDeath is the correct hook for ragdoll spawning
 hook.Add("DoPlayerDeath", "DarkDriftPlayerDeath", function(victim, inflictor, attacker)
     if not IsValid(victim) then return end
     local ent = ents.Create("prop_ragdoll")
@@ -23,6 +22,7 @@ hook.Add("OnNPCKilled", "DarkDriftNPCDeath", function(npc, attacker, inflictor)
     ent:Spawn()
     ent:Activate()
     ent.Ragdoll = true
+    npc:Remove()
 end)
 
 hook.Add("ShouldCollide", "DungeonPropCollide", function(ent1, ent2)
