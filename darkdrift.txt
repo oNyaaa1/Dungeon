@@ -1,0 +1,8 @@
+"darkdrift"
+{
+    "base"          "base"
+    "title"         "The Dark Drift"
+    "maps"          "^_"
+    "category"      "pvp"
+    "menusystem"    "1"
+}
