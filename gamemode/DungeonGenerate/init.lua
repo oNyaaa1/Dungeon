@@ -8,13 +8,14 @@ local CFG = {
     MapW = 60,
     MapH = 60,
     MaxPlayers = 32,
-    WallH = 240, -- 2 x 120u plates
+    WallH = 240,
     PlateSize = 120,
-    WallOffset = 60, -- half tile
+    WallOffset = 60,
     NPCTypes = {
         {
             class = "npc_evil_ass_skeleton",
-            weight = 40
+            weight = 100,
+            nextbot = true
         },
     },
     NPCPerRoom = {
@@ -175,7 +176,6 @@ local function spawnRoofs(origin, tileList)
         local wx = origin.x + tile.x * CFG.TileSize
         local wy = origin.y + tile.y * CFG.TileSize
         local gz = groundZ(Vector(wx, wy, origin.z))
-        -- Flat single level: roof = ground + WallH, one consistent height
         spawnProp(Vector(wx, wy, gz + CFG.WallH), Angle(0, 0, 0))
     end
 end
@@ -213,7 +213,7 @@ local DIRS = {
 }
 
 local function spawnWalls(origin, tileSet)
-    local stackCount = math.ceil(CFG.WallH / CFG.PlateSize) -- exactly 2
+    local stackCount = math.ceil(CFG.WallH / CFG.PlateSize)
     for key in pairs(tileSet) do
         local tx, ty = key:match("(-?%d+),(-?%d+)")
         tx, ty = tonumber(tx), tonumber(ty)
@@ -242,12 +242,44 @@ local function spawnNPCsForRoom(origin, room)
         local wx = origin.x + tx * CFG.TileSize
         local wy = origin.y + ty * CFG.TileSize
         local gz = groundZ(Vector(wx, wy, origin.z))
+        local spawnPos = Vector(wx, wy, gz + 10)
         local npc = ents.Create(npcType.class)
         if not IsValid(npc) then continue end
-        npc:SetPos(Vector(wx, wy, gz + 10))
+        npc:SetPos(spawnPos)
         npc:Spawn()
         npc:Activate()
-        npc:DrawShadow(false)
+        npc:SetCollisionGroup(COLLISION_GROUP_WORLD)
+        function npc:TeleportToRecoveryPos()
+            npc:SetPos(spawnPos)
+        end
+
+        function npc:OnKilled(damageInfo)
+            hook.Run("OnNPCKilled", self, damageInfo:GetAttacker(), damageInfo:GetInflictor())
+            self:BecomeRagdoll(damageInfo)
+        end
+
+        function npc:HandleStuck()
+            //self.loco:ClearStuck()
+            self:TeleportToRecoveryPos(spawnPos)
+        end
+
+        if npcType.nextbot then
+            -- Nextbots ignore SetPos until fully initialized,
+            -- so defer position to land on top of floor props
+            local finalPos = spawnPos
+            timer.Simple(1, function()
+                if not IsValid(npc) then return end
+                local tr = util.TraceLine({
+                    start = finalPos + Vector(0, 0, 200),
+                    endpos = finalPos - Vector(0, 0, 200),
+                    mask = MASK_SOLID,
+                })
+
+                local landPos = tr.Hit and (tr.HitPos + Vector(0, 0, 10)) or finalPos
+                npc:SetPos(landPos)
+            end)
+        end
+
         table.insert(Dungeon.NPCs, npc)
     end
 end
@@ -316,7 +348,14 @@ function Dungeon:Generate(origin)
     math.randomseed(os.time())
     print("Generating dungeon...")
     Dungeon.Cleanup()
-    origin = origin or Vector(0, 0, 0)
+    -- Snap origin to ground so dungeon never floats
+    local tr = util.TraceLine({
+        start = origin + Vector(0, 0, 500),
+        endpos = origin - Vector(0, 0, 5000),
+        mask = MASK_SOLID_BRUSHONLY,
+    })
+
+    origin = tr.Hit and tr.HitPos or origin
     Dungeon.Origin = origin
     local rooms, tiles, tileSet = Dungeon.BuildLayout()
     spawnFloors(origin, tiles)
@@ -330,17 +369,23 @@ end
 -- ── Max Players ──────────────────────────────────────────────────────────────
 hook.Add("CheckPassword", "DungeonMaxPlayers", function() if player.GetCount() >= CFG.MaxPlayers then return false, "Server is full! (Max " .. CFG.MaxPlayers .. " players)" end end)
 -- ── Player Hooks ─────────────────────────────────────────────────────────────
+-- Only generate once when the FIRST player spawns, then just teleport after that
 hook.Add("PlayerSpawn", "DungeonGen", function(ply)
-    Dungeon:Generate(ply:GetPos())
-    if #Dungeon.SpawnPos > 0 then timer.Simple(0.1, function() if IsValid(ply) then ply:SetPos(Dungeon.GetSpawnPos()) end end) end
+    if #Dungeon.Entities == 0 then
+        -- First time: generate then teleport
+        Dungeon:Generate(ply:GetPos())
+        timer.Simple(0.2, function() if IsValid(ply) and #Dungeon.SpawnPos > 0 then ply:SetPos(Dungeon.GetSpawnPos()) end end)
+    else
+        -- Dungeon already exists: just teleport in
+        timer.Simple(0.1, function() if IsValid(ply) and #Dungeon.SpawnPos > 0 then ply:SetPos(Dungeon.GetSpawnPos()) end end)
+    end
 end)
 
 -- ── Commands ─────────────────────────────────────────────────────────────────
 concommand.Add("dungeon_generate", function(ply)
     if not IsValid(ply) or ply:IsAdmin() then
         Dungeon:Generate(IsValid(ply) and ply:GetPos() or Vector(0, 0, 0))
-        -- Teleport caller straight to dungeon after generation
-        timer.Simple(0.1, function() if IsValid(ply) then ply:SetPos(Dungeon.GetSpawnPos()) end end)
+        timer.Simple(0.2, function() if IsValid(ply) then ply:SetPos(Dungeon.GetSpawnPos()) end end)
     end
 end)
 
