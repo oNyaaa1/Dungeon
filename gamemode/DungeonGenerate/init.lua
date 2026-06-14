@@ -1,52 +1,41 @@
 print("Dungeon Loaded")
-
 local CFG = {
-    TileSize   = 120,
+    TileSize = 120,
     TraceAbove = 512,
-    NumRooms   = 12,
-    RoomMin    = 5,
-    RoomMax    = 10,
-    MapW       = 60,
-    MapH       = 60,
+    NumRooms = 12,
+    RoomMin = 5,
+    RoomMax = 10,
+    MapW = 60,
+    MapH = 60,
     MaxPlayers = 32,
-
-    WallH      = 240,   -- 2 x 120u plates
-    PlateSize  = 120,
-    WallOffset = 60,    -- half tile
-
+    WallH = 240, -- 2 x 120u plates
+    PlateSize = 120,
+    WallOffset = 60, -- half tile
     NPCTypes = {
         { class = "npc_zombie",     weight = 40 },
         { class = "npc_fastzombie", weight = 20 },
         { class = "npc_combine_s",  weight = 25 },
         { class = "npc_manhack",    weight = 15 },
     },
-    NPCPerRoom     = { min = 2, max = 5 },
-    NPCRespawn     = true,
+    NPCRespawn = true,
     NPCRespawnTime = 30,
 }
 
 local PLATE_MODEL = "models/props_phx/construct/metal_plate4x4.mdl"
-
-Dungeon            = Dungeon or {}
-Dungeon.Entities   = Dungeon.Entities or {}
-Dungeon.NPCs       = Dungeon.NPCs or {}
-Dungeon.SpawnPos   = Dungeon.SpawnPos or {}
-Dungeon.LastRooms  = Dungeon.LastRooms or {}
-Dungeon.Origin     = Dungeon.Origin or Vector(0,0,0)
-Dungeon._spawnIdx  = 0
-
+Dungeon = Dungeon or {}
+Dungeon.Entities = Dungeon.Entities or {}
+Dungeon.NPCs = Dungeon.NPCs or {}
+Dungeon.SpawnPos = Dungeon.SpawnPos or {}
+Dungeon.LastRooms = Dungeon.LastRooms or {}
+Dungeon.Origin = Dungeon.Origin or Vector(0, 0, 0)
+Dungeon._spawnIdx = 0
 -- ── Helpers ──────────────────────────────────────────────────────────────────
-
 local function overlaps(a, b)
-    return not (
-        a.x + a.w + 1 <= b.x or b.x + b.w + 1 <= a.x or
-        a.y + a.h + 1 <= b.y or b.y + b.h + 1 <= a.y
-    )
+    return not (a.x + a.w + 1 <= b.x or b.x + b.w + 1 <= a.x or a.y + a.h + 1 <= b.y or b.y + b.h + 1 <= a.y)
 end
 
 local function center(room)
-    return math.floor(room.x + room.w * 0.5),
-           math.floor(room.y + room.h * 0.5)
+    return math.floor(room.x + room.w * 0.5), math.floor(room.y + room.h * 0.5)
 end
 
 local function freeze(ent)
@@ -56,16 +45,19 @@ end
 
 local function groundZ(pos)
     local tr = util.TraceLine({
-        start  = pos + Vector(0, 0, CFG.TraceAbove),
+        start = pos + Vector(0, 0, CFG.TraceAbove),
         endpos = pos - Vector(0, 0, CFG.TraceAbove),
-        mask   = MASK_SOLID_BRUSHONLY,
+        mask = MASK_SOLID_BRUSHONLY,
     })
     return tr.Hit and tr.HitPos.z or pos.z
 end
 
 local function weightedRandom(items)
     local total = 0
-    for _, v in ipairs(items) do total = total + v.weight end
+    for _, v in ipairs(items) do
+        total = total + v.weight
+    end
+
     local r = math.random(1, total)
     local acc = 0
     for _, v in ipairs(items) do
@@ -89,15 +81,16 @@ local function spawnProp(pos, ang)
 end
 
 -- ── Layout ───────────────────────────────────────────────────────────────────
-
 function Dungeon.BuildLayout()
     local rooms, tileSet, tileList = {}, {}, {}
-
     local function addTile(x, y)
-        local k = x..","..y
+        local k = x .. "," .. y
         if not tileSet[k] then
             tileSet[k] = true
-            table.insert(tileList, { x=x, y=y })
+            table.insert(tileList, {
+                x = x,
+                y = y
+            })
         end
     end
 
@@ -108,13 +101,22 @@ function Dungeon.BuildLayout()
             local r = {
                 x = math.random(1, CFG.MapW - w - 1),
                 y = math.random(1, CFG.MapH - h - 1),
-                w = w, h = h,
+                w = w,
+                h = h,
             }
+
             local ok = true
             for _, e in ipairs(rooms) do
-                if overlaps(r, e) then ok = false; break end
+                if overlaps(r, e) then
+                    ok = false
+                    break
+                end
             end
-            if ok then table.insert(rooms, r); break end
+
+            if ok then
+                table.insert(rooms, r)
+                break
+            end
         end
     end
 
@@ -129,19 +131,20 @@ function Dungeon.BuildLayout()
     -- 2-tile wide corridors
     for i = 1, #rooms - 1 do
         local ax, ay = center(rooms[i])
-        local bx, by = center(rooms[i+1])
+        local bx, by = center(rooms[i + 1])
         local cx, cy = ax, ay
-
         while cx ~= bx do
             addTile(cx, cy)
             addTile(cx, cy + 1)
             cx = cx + (bx > cx and 1 or -1)
         end
+
         while cy ~= by do
             addTile(cx, cy)
             addTile(cx + 1, cy)
             cy = cy + (by > cy and 1 or -1)
         end
+
         addTile(bx, by)
         addTile(bx + 1, by)
     end
@@ -151,7 +154,6 @@ function Dungeon.BuildLayout()
 end
 
 -- ── Floor ────────────────────────────────────────────────────────────────────
-
 local function spawnFloors(origin, tileList)
     for _, tile in ipairs(tileList) do
         local wx = origin.x + tile.x * CFG.TileSize
@@ -162,7 +164,6 @@ local function spawnFloors(origin, tileList)
 end
 
 -- ── Roof ─────────────────────────────────────────────────────────────────────
-
 local function spawnRoofs(origin, tileList)
     for _, tile in ipairs(tileList) do
         local wx = origin.x + tile.x * CFG.TileSize
@@ -174,30 +175,49 @@ local function spawnRoofs(origin, tileList)
 end
 
 -- ── Walls ────────────────────────────────────────────────────────────────────
-
 local DIRS = {
-    { dx= 0, dy=-1, ox=0,              oy=-CFG.WallOffset, yaw=  0 },
-    { dx= 0, dy= 1, ox=0,              oy= CFG.WallOffset, yaw=180 },
-    { dx= 1, dy= 0, ox= CFG.WallOffset, oy=0,              yaw= 90 },
-    { dx=-1, dy= 0, ox=-CFG.WallOffset, oy=0,              yaw=270 },
+    {
+        dx = 0,
+        dy = -1,
+        ox = 0,
+        oy = -CFG.WallOffset,
+        yaw = 0
+    },
+    {
+        dx = 0,
+        dy = 1,
+        ox = 0,
+        oy = CFG.WallOffset,
+        yaw = 180
+    },
+    {
+        dx = 1,
+        dy = 0,
+        ox = CFG.WallOffset,
+        oy = 0,
+        yaw = 90
+    },
+    {
+        dx = -1,
+        dy = 0,
+        ox = -CFG.WallOffset,
+        oy = 0,
+        yaw = 270
+    },
 }
 
 local function spawnWalls(origin, tileSet)
-    local stackCount = math.ceil(CFG.WallH / CFG.PlateSize)  -- exactly 2
-
+    local stackCount = math.ceil(CFG.WallH / CFG.PlateSize) -- exactly 2
     for key in pairs(tileSet) do
         local tx, ty = key:match("(-?%d+),(-?%d+)")
         tx, ty = tonumber(tx), tonumber(ty)
-
         local wx = origin.x + tx * CFG.TileSize
         local wy = origin.y + ty * CFG.TileSize
         local gz = groundZ(Vector(wx, wy, origin.z))
-
         for _, d in ipairs(DIRS) do
-            if not tileSet[(tx+d.dx)..",".. (ty+d.dy)] then
+            if not tileSet[(tx + d.dx) .. "," .. (ty + d.dy)] then
                 local wallX = wx + d.ox
                 local wallY = wy + d.oy
-
                 for i = 1, stackCount do
                     local wallZ = gz + (i - 0.5) * CFG.PlateSize
                     spawnProp(Vector(wallX, wallY, wallZ), Angle(0, d.yaw, 90))
@@ -208,7 +228,6 @@ local function spawnWalls(origin, tileSet)
 end
 
 -- ── NPCs ─────────────────────────────────────────────────────────────────────
-
 local function spawnNPCsForRoom(origin, room)
     for _ = 1, math.random(CFG.NPCPerRoom.min, CFG.NPCPerRoom.max) do
         local npcType = weightedRandom(CFG.NPCTypes)
@@ -217,7 +236,6 @@ local function spawnNPCsForRoom(origin, room)
         local wx = origin.x + tx * CFG.TileSize
         local wy = origin.y + ty * CFG.TileSize
         local gz = groundZ(Vector(wx, wy, origin.z))
-
         local npc = ents.Create(npcType.class)
         if not IsValid(npc) then continue end
         npc:SetPos(Vector(wx, wy, gz + 10))
@@ -231,10 +249,12 @@ function Dungeon.SpawnAllNPCs(origin)
     for _, n in ipairs(Dungeon.NPCs) do
         if IsValid(n) then n:Remove() end
     end
+
     Dungeon.NPCs = {}
     for _, room in ipairs(Dungeon.LastRooms) do
         spawnNPCsForRoom(origin, room)
     end
+
     print(string.format("Dungeon: %d NPCs spawned.", #Dungeon.NPCs))
 end
 
@@ -243,18 +263,15 @@ local function checkNPCRespawn()
     for _, n in ipairs(Dungeon.NPCs) do
         if IsValid(n) and n:Health() > 0 then return end
     end
-    print("Dungeon: all NPCs dead, respawning in "..CFG.NPCRespawnTime.."s...")
-    timer.Simple(CFG.NPCRespawnTime, function()
-        Dungeon.SpawnAllNPCs(Dungeon.Origin)
-    end)
+
+    print("Dungeon: all NPCs dead, respawning in " .. CFG.NPCRespawnTime .. "s...")
+    timer.Simple(CFG.NPCRespawnTime, function() Dungeon.SpawnAllNPCs(Dungeon.Origin) end)
 end
 
 hook.Add("OnNPCKilled", "DungeonNPCKilled", function() checkNPCRespawn() end)
-
 -- ── Spawn Points ─────────────────────────────────────────────────────────────
-
 local function buildSpawnPoints(origin, rooms)
-    Dungeon.SpawnPos  = {}
+    Dungeon.SpawnPos = {}
     Dungeon._spawnIdx = 0
     for _, r in ipairs(rooms) do
         local cx = origin.x + math.floor(r.x + r.w * 0.5) * CFG.TileSize
@@ -271,103 +288,64 @@ function Dungeon.GetSpawnPos()
 end
 
 -- ── Cleanup ──────────────────────────────────────────────────────────────────
-
 function Dungeon.Cleanup()
     for _, e in ipairs(Dungeon.Entities) do
         if IsValid(e) then e:Remove() end
     end
+
     for _, n in ipairs(Dungeon.NPCs) do
         if IsValid(n) then n:Remove() end
     end
-    Dungeon.Entities  = {}
-    Dungeon.NPCs      = {}
-    Dungeon.SpawnPos  = {}
+
+    Dungeon.Entities = {}
+    Dungeon.NPCs = {}
+    Dungeon.SpawnPos = {}
     Dungeon._spawnIdx = 0
     print("Dungeon cleaned up.")
 end
 
 -- ── Generate ─────────────────────────────────────────────────────────────────
-
 function Dungeon:Generate(origin)
     math.randomseed(os.time())
     print("Generating dungeon...")
     Dungeon.Cleanup()
-
-    origin         = origin or Vector(0, 0, 0)
+    origin = origin or Vector(0, 0, 0)
     Dungeon.Origin = origin
-
     local rooms, tiles, tileSet = Dungeon.BuildLayout()
-
     spawnFloors(origin, tiles)
     spawnWalls(origin, tileSet)
     spawnRoofs(origin, tiles)
     buildSpawnPoints(origin, rooms)
     Dungeon.SpawnAllNPCs(origin)
-
-    print(string.format(
-        "Done: %d rooms | %d tiles | %d ents | %d NPCs | %d spawns",
-        #rooms, #tiles, #Dungeon.Entities, #Dungeon.NPCs, #Dungeon.SpawnPos))
+    print(string.format("Done: %d rooms | %d tiles | %d ents | %d NPCs | %d spawns", #rooms, #tiles, #Dungeon.Entities, #Dungeon.NPCs, #Dungeon.SpawnPos))
 end
 
 -- ── Max Players ──────────────────────────────────────────────────────────────
-
-hook.Add("CheckPassword", "DungeonMaxPlayers", function()
-    if player.GetCount() >= CFG.MaxPlayers then
-        return false, "Server is full! (Max "..CFG.MaxPlayers.." players)"
-    end
-end)
-
+hook.Add("CheckPassword", "DungeonMaxPlayers", function() if player.GetCount() >= CFG.MaxPlayers then return false, "Server is full! (Max " .. CFG.MaxPlayers .. " players)" end end)
 -- ── Player Hooks ─────────────────────────────────────────────────────────────
-
 hook.Add("PlayerSpawn", "DungeonGen", function(ply)
-    if ply:IsAdmin() and #Dungeon.Entities == 0 then
-        Dungeon:Generate(ply:GetPos())
-    end
-end)
-
-hook.Add("PlayerSpawn", "DungeonPlayerSpawn", function(ply)
-    if #Dungeon.SpawnPos > 0 then
-        timer.Simple(0.1, function()
-            if IsValid(ply) then ply:SetPos(Dungeon.GetSpawnPos()) end
-        end)
-    end
+    Dungeon:Generate(ply:GetPos())
+    if #Dungeon.SpawnPos > 0 then timer.Simple(0.1, function() if IsValid(ply) then ply:SetPos(Dungeon.GetSpawnPos()) end end) end
 end)
 
 -- ── Commands ─────────────────────────────────────────────────────────────────
-
 concommand.Add("dungeon_generate", function(ply)
     if not IsValid(ply) or ply:IsAdmin() then
-        Dungeon:Generate(IsValid(ply) and ply:GetPos() or Vector(0,0,0))
+        Dungeon:Generate(IsValid(ply) and ply:GetPos() or Vector(0, 0, 0))
         -- Teleport caller straight to dungeon after generation
-        timer.Simple(0.1, function()
-            if IsValid(ply) then
-                ply:SetPos(Dungeon.GetSpawnPos())
-            end
-        end)
+        timer.Simple(0.1, function() if IsValid(ply) then ply:SetPos(Dungeon.GetSpawnPos()) end end)
     end
 end)
 
-concommand.Add("dungeon_cleanup", function(ply)
-    if not IsValid(ply) or ply:IsAdmin() then Dungeon.Cleanup() end
-end)
-
-concommand.Add("dungeon_spawnnpcs", function(ply)
-    if not IsValid(ply) or ply:IsAdmin() then
-        Dungeon.SpawnAllNPCs(Dungeon.Origin)
-    end
-end)
-
+concommand.Add("dungeon_cleanup", function(ply) if not IsValid(ply) or ply:IsAdmin() then Dungeon.Cleanup() end end)
+concommand.Add("dungeon_spawnnpcs", function(ply) if not IsValid(ply) or ply:IsAdmin() then Dungeon.SpawnAllNPCs(Dungeon.Origin) end end)
 concommand.Add("dungeon_info", function(ply)
     if IsValid(ply) then
         local alive = 0
         for _, n in ipairs(Dungeon.NPCs) do
             if IsValid(n) and n:Health() > 0 then alive = alive + 1 end
         end
-        ply:ChatPrint(string.format(
-            "Dungeon: %d rooms | %d ents | %d/%d NPCs | %d/%d players | %d spawns",
-            #Dungeon.LastRooms, #Dungeon.Entities,
-            alive, #Dungeon.NPCs,
-            player.GetCount(), CFG.MaxPlayers,
-            #Dungeon.SpawnPos))
+
+        ply:ChatPrint(string.format("Dungeon: %d rooms | %d ents | %d/%d NPCs | %d/%d players | %d spawns", #Dungeon.LastRooms, #Dungeon.Entities, alive, #Dungeon.NPCs, player.GetCount(), CFG.MaxPlayers, #Dungeon.SpawnPos))
     end
 end)
