@@ -39,6 +39,16 @@ function SWEP:Think()
 end
 
 function SWEP:PrimaryAttack()
+    local pl = self:GetOwner()
+    if not IsValid(pl) then return end
+    self:EmitSound("darkdrift/darkdrift_confetti.mp3")
+    if CLIENT then
+        local effects = EffectData()
+        effects:SetOrigin(pl:GetShootPos())
+        util.Effect("confetti", effects)
+    end
+
+    self:SetNextPrimaryFire(CurTime() + 1)
 end
 
 function SWEP:SecondaryAttack()
