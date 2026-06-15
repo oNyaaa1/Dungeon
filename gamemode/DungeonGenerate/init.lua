@@ -255,13 +255,102 @@ local function spawnNPCsForRoom(origin, room)
 
         function npc:OnKilled(damageInfo)
             hook.Run("OnNPCKilled", self, damageInfo:GetAttacker(), damageInfo:GetInflictor())
-            hook.Run("PlayerDeath", self, damageInfo:GetInflictor(),  damageInfo:GetAttacker())
+            hook.Run("PlayerDeath", self, damageInfo:GetInflictor(), damageInfo:GetAttacker())
             self:BecomeRagdoll(damageInfo)
         end
 
         function npc:HandleStuck()
-            --self.loco:ClearStuck()
+            self.loco:ClearStuck()
             self:TeleportToRecoveryPos(spawnPos)
+        end
+
+        function npc:IsGoodRecoveryPosition(pos)
+            return self:IsRecoveryPositionClear(pos) and self:IsRecoveryPositionOnNavmesh(pos)
+        end
+
+        function npc:GetRecoveryPos(pos)
+            local wantedPos = pos + Vector(0, 0, 6)
+            if self:IsGoodRecoveryPosition(wantedPos) then return wantedPos end
+            local navPos = self:GetRandomNavmeshRecoveryPos()
+            if navPos then return navPos end
+            return pos + Vector(0, 0, 48)
+        end
+
+        function npc:RecoverFromLaunch(pos)
+            timer.Simple(self.RecoverDelay, function()
+                if not IsValid(self) then return end
+                local targetPos = self:GetRecoveryPos(pos)
+                self:SetPos(targetPos)
+                self:SetNoDraw(false)
+                self:SetNotSolid(false)
+                self:RefreshConfiguredMovement()
+                self.loco:ClearStuck()
+                self.IsRagdollLaunching = false
+                self.ActiveRagdoll = nil
+                self:ApplySprintSequence()
+            end)
+        end
+
+        function npc:LaunchAsRagdoll(target)
+            if self.IsRagdollLaunching or not IsValid(target) then return end
+            self.IsRagdollLaunching = true
+            self.LastLaunchTime = CurTime()
+            self.NextLaunch = self.LastLaunchTime + self:GetConfiguredLaunchCooldown()
+            self.LastDamageTimes = {}
+            self.HitVictims = {}
+            local startPos = self:GetPos()
+            local startAngles = self:GetAngles()
+            local aimDir = (target:WorldSpaceCenter() - self:WorldSpaceCenter()):GetNormalized()
+            self:BecomeHiddenChaser()
+            local ragdoll = ents.Create("prop_ragdoll")
+            if not IsValid(ragdoll) then
+                self:RecoverFromLaunch(startPos)
+                return
+            end
+
+            ragdoll:SetModel(self.Model)
+            ragdoll:SetPos(startPos + Vector(0, 0, 8))
+            ragdoll:SetAngles(startAngles)
+            ragdoll:SetOwner(self)
+            ragdoll:SetCollisionGroup(COLLISION_GROUP_NONE)
+            ragdoll:Spawn()
+            ragdoll:Activate()
+            self.ActiveRagdoll = ragdoll
+            timer.Simple(0, function()
+                if not IsValid(self) or not IsValid(ragdoll) then return end
+                self:ThrowRagdoll(ragdoll, aimDir)
+            end)
+
+            ragdoll:AddCallback("PhysicsCollide", function(_, data)
+                if not IsValid(self) then return end
+                local hitEnt = data.HitEntity
+                if IsValid(hitEnt) and data.OurOldVelocity:Length() > 420 then self:DamageVictim(hitEnt, ragdoll, data.OurOldVelocity:GetNormalized(), self:GetConfiguredDamage()) end
+            end)
+
+            local timerName = "evil_skeleton_ragdoll_" .. self:EntIndex()
+            self.RagdollTimerName = timerName
+            local ragdollTime = self:GetConfiguredRagdollTime()
+            timer.Create(timerName, 0.05, math.ceil(ragdollTime / 0.05), function()
+                if not IsValid(self) or not IsValid(ragdoll) then
+                    timer.Remove(timerName)
+                    return
+                end
+
+                self:DamageNearbyVictims(ragdoll)
+            end)
+
+            timer.Simple(ragdollTime, function()
+                if not IsValid(self) then return end
+                local recoverPos = IsValid(ragdoll) and ragdoll:GetPos() or startPos
+                local npc = ents.Create(npcType.class)
+                if not IsValid(npc) then return end
+                npc:SetPos(recoverPos)
+                npc:Spawn()
+                npc:Activate()
+                npc:SetCollisionGroup(COLLISION_GROUP_WORLD)
+                if IsValid(ragdoll) then ragdoll:Remove() end
+                self:RecoverFromLaunch(recoverPos)
+            end)
         end
 
         if npcType.nextbot then

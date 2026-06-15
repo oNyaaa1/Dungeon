@@ -14,7 +14,7 @@ end
 SWEP.Author = "oNyaaa"
 SWEP.Contact = ""
 SWEP.Purpose = "Powerful Confetti gun"
-SWEP.Instructions = "Right click to kill Nextbots / NPCS"
+SWEP.Instructions = "Right click to kill Nextbots / NPCS, And remove Ragdolls for points"
 SWEP.Category = "oNyaaa"
 SWEP.Spawnable = true
 SWEP.AdminSpawnable = true
@@ -59,8 +59,16 @@ function SWEP:PrimaryAttack()
     end
 
     if SERVER then
+        local ent = tr.Entity
+        if ent:IsRagdoll() and ent:Health() <= 0 then
+            if IsValid(pl) then pl:SetFrags(pl:Frags() + 1) end
+            ent:Remove()
+        end
+    end
+
+    if SERVER then
         for k, target in pairs(ents.FindInSphere(tr.Entity:GetPos(), 50)) do
-            target:TakeDamage(100, pl, pl)
+            if IsValid(target) then target:TakeDamage(100, pl, pl) end
         end
     end
 

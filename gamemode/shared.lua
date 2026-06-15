@@ -18,7 +18,7 @@ hook.Add("PlayerDeath", "DarkDriftPlayerDeath", function(victim, inflictor, atta
     ent:Spawn()
     ent:Activate()
     ent.Ragdoll = true
-    local death_Rag = victim:GetRagdollEntity()
+    local death_Rag = IsValid(victim) and victim.GetRagdollEntity and victim:GetRagdollEntity()
     if IsValid(death_Rag) then death_Rag:Remove() end
 end)
 
