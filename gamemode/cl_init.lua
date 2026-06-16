@@ -1,10 +1,17 @@
--- Client-side gamemode init: load shared logic and client-side subsystems.
 include("shared.lua")
-
--- Load client-side inventory UI.
 local DungeonGenerate = "Inventory/"
 include(DungeonGenerate .. "cl_init.lua")
-
--- Load scoreboard (shared file, included on both sides).
+include(DungeonGenerate .. "threegrid.lua")
 local DungeonGenerate = "scoreboard/"
 include(DungeonGenerate .. "shared.lua")
+local DungeonGenerate = "hud/"
+include(DungeonGenerate .. "cl_init.lua")
+local DontDraw = {
+    ["CHudHealth"] = true,
+    ["CHudWeaponSelection"] = true,
+    ["CHudBattery"] = true,
+}
+
+function GM:HUDShouldDraw(name)
+    return not DontDraw[name]
+end

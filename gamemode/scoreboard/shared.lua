@@ -18,7 +18,7 @@ else
         ScoreBoard.sb2.Paint = function(s, w, h)
             draw.RoundedBox(0, 0, 0, w, h, Color(0, 0, 0, 0))
             draw.DrawText("DarkDrift", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
-            draw.DrawText("Gamemode", "DarkDrift", ScoreBoard.sb:GetWide() - 140, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
+            draw.DrawText("Gamemode", "DarkDrift", ScoreBoard.sb:GetWide() - 80, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
         end
 
         local likable = vgui.Create("DImage", ScoreBoard.sb2)
@@ -27,7 +27,7 @@ else
         likable:SetImage("darkdrift/skeleton.png")
         ScoreBoard.sb3 = vgui.Create("DPanel", ScoreBoard.sb)
         ScoreBoard.sb3:Dock(LEFT)
-        ScoreBoard.sb3:SetWide(200)
+        ScoreBoard.sb3:SetWide(150)
         ScoreBoard.sb3.Paint = function(s, w, h)
             draw.RoundedBox(0, 0, 0, w, h, Color(255, 255, 255, 255))
             draw.DrawText("Name", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
@@ -36,7 +36,7 @@ else
         ScoreBoard.sb32 = vgui.Create("DPanel", ScoreBoard.sb3)
         ScoreBoard.sb32:Dock(LEFT)
         ScoreBoard.sb32:DockMargin(0, 25, 0, 0)
-        ScoreBoard.sb32:SetWide(200)
+        ScoreBoard.sb32:SetWide(150)
         ScoreBoard.sb32.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, Color(120, 120, 120, 255)) end
         for k, name in pairs(player.GetAll()) do
             ScoreBoard.dbutton = vgui.Create("DButton", ScoreBoard.sb32)
@@ -50,9 +50,34 @@ else
             ScoreBoard.dbutton:SetText("")
         end
 
+        ScoreBoard.sb3232 = vgui.Create("DPanel", ScoreBoard.sb)
+        ScoreBoard.sb3232:Dock(LEFT)
+        ScoreBoard.sb3232:SetWide(200)
+        ScoreBoard.sb3232.Paint = function(s, w, h)
+            draw.RoundedBox(0, 0, 0, w, h, Color(255, 255, 255, 255))
+            draw.DrawText("Health", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
+        end
+
+        ScoreBoard.sb324 = vgui.Create("DPanel", ScoreBoard.sb3232)
+        ScoreBoard.sb324:Dock(LEFT)
+        ScoreBoard.sb324:DockMargin(0, 25, 0, 0)
+        ScoreBoard.sb324:SetWide(200)
+        ScoreBoard.sb324.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, Color(120, 120, 120, 255)) end
+        for k, name in pairs(player.GetAll()) do
+            ScoreBoard.dbutton = vgui.Create("DButton", ScoreBoard.sb324)
+            ScoreBoard.dbutton:Dock(TOP)
+            ScoreBoard.dbutton:SizeToContents()
+            ScoreBoard.dbutton.Paint = function(s, w, h)
+                draw.RoundedBox(0, 0, 0, w, h, Color(52, 52, 52, 0))
+                draw.DrawText(tostring(name:Health()), "DarkDrift", 0, 0, Color(255, 255, 255, 255), TEXT_ALIGN_LEFT)
+            end
+
+            ScoreBoard.dbutton:SetText("")
+        end
+
         ScoreBoard.sb4 = vgui.Create("DPanel", ScoreBoard.sb)
         ScoreBoard.sb4:Dock(LEFT)
-        ScoreBoard.sb4:SetWide(200)
+        ScoreBoard.sb4:SetWide(150)
         ScoreBoard.sb4.Paint = function(s, w, h)
             draw.RoundedBox(0, 0, 0, w, h, Color(255, 255, 255, 255))
             draw.DrawText("Kills", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
@@ -61,7 +86,7 @@ else
         ScoreBoard.sb42 = vgui.Create("DPanel", ScoreBoard.sb4)
         ScoreBoard.sb42:Dock(LEFT)
         ScoreBoard.sb42:DockMargin(0, 25, 0, 0)
-        ScoreBoard.sb42:SetWide(200)
+        ScoreBoard.sb42:SetWide(150)
         ScoreBoard.sb42.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, Color(120, 120, 120, 255)) end
         for k, name in pairs(player.GetAll()) do
             ScoreBoard.dbutton = vgui.Create("DButton", ScoreBoard.sb42)
@@ -77,7 +102,7 @@ else
 
         ScoreBoard.sb5 = vgui.Create("DPanel", ScoreBoard.sb)
         ScoreBoard.sb5:Dock(LEFT)
-        ScoreBoard.sb5:SetWide(200)
+        ScoreBoard.sb5:SetWide(150)
         ScoreBoard.sb5.Paint = function(s, w, h)
             draw.RoundedBox(0, 0, 0, w, h, Color(255, 255, 255, 255))
             draw.DrawText("Deaths", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)

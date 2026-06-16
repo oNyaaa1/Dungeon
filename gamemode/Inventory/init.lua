@@ -1,1 +1,18 @@
-///
+AddCSLuaFile("party/shared.lua")
+include("party/shared.lua")
+util.AddNetworkString("DarkDrift_Guns")
+util.AddNetworkString("DarkDrift_Clear")
+function SendMyGunImg(ply, num, name, mat, gun_name)
+    net.Start("DarkDrift_Guns")
+    net.WriteString(name)
+    net.WriteString(mat)
+    net.WriteString(gun_name)
+    net.WriteFloat(num)
+    net.Send(ply)
+    ply:Give(gun_name)
+end
+
+hook.Add("PlayerDeath", "thedeath", function(victim)
+    net.Start("DarkDrift_Clear")
+    net.Send(victim)
+end)
