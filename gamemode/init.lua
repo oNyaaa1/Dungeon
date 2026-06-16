@@ -4,22 +4,27 @@ include("shared.lua")
 local DungeonGenerate = "DungeonGenerate/"
 include(DungeonGenerate .. "init.lua")
 local DungeonGenerate = "Inventory/"
-include(DungeonGenerate .. "init.lua")
 AddCSLuaFile(DungeonGenerate .. "cl_init.lua")
+include(DungeonGenerate .. "init.lua")
+local DungeonGenerate = "scoreboard/"
+include(DungeonGenerate .. "shared.lua")
+AddCSLuaFile(DungeonGenerate .. "shared.lua")
 for k, v in pairs(file.Find("sound/darkdrift/" .. "*", "GAME")) do
     resource.AddFile("sound/darkdrift/" .. v)
 end
-
+for k, v in pairs(file.Find("materials/darkdrift/" .. "*", "GAME")) do
+    resource.AddFile("materials/darkdrift/" .. v)
+end
 hook.Add("PlayerInitialSpawn", "SetCustomCollisions", function(ply) ply:SetCustomCollisionCheck(true) end)
 hook.Add("PlayerSpawn", "SetCustomCollisions", function(ply)
     ply:SetModel("models/player/breen.mdl")
-    --ply:Give("confetti_gun")
     ply:SetFrags(0)
     ply:SetRunSpeed(900)
 end)
 
 hook.Add("PlayerDeath", "DarkDriftPlayerDeath", function(victim, inflictor, attacker)
-    if IsValid(attacker) then attacker:SetFrags(attacker:Frags() + 1) end
+    local ply = attacker
+    if IsValid(ply) then ply:SetFrags(ply:Frags() + 1) end
     if not IsValid(victim) then return end
     local ent = ents.Create("prop_ragdoll")
     if not IsValid(ent) then return end
