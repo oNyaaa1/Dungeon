@@ -120,8 +120,9 @@ local TRAP_TYPES = {
 }
 
 -- ── Trap Spawning ────────────────────────────────────────────────────────────
-local function spawnTrap(origin, tileX, tileY)
-    local trapType = TRAP_TYPES[math.random(1, #TRAP_TYPES)]
+local function spawnTrap(origin, tileX, tileY, forcedType)
+    -- forcedType lets a relocated plate keep the same kind (heal stays heal, etc.)
+    local trapType = forcedType or TRAP_TYPES[math.random(1, #TRAP_TYPES)]
     local wx = origin.x + tileX * CFG.TileSize
     local wy = origin.y + tileY * CFG.TileSize
     local gz = groundZ(Vector(wx, wy, origin.z))
@@ -138,6 +139,7 @@ local function spawnTrap(origin, tileX, tileY)
     local trapData = {
         pos = Vector(wx, wy, gz),
         type = trapType.name,
+        typeData = trapType,
         damage = trapType.damage,
         heal = trapType.heal,
         color = trapType.color,
@@ -225,6 +227,34 @@ function Dungeon.SpawnAllLootBoxes(origin)
     print(string.format("Dungeon: %d loot boxes spawned.", #Dungeon.LootBoxes))
 end
 
+-- ── Trap Relocation ──────────────────────────────────────────────────────────
+-- Pick a random interior tile in a random non-spawn room.
+local function randomTrapTile()
+    if #Dungeon.LastRooms < 2 then return nil end
+    local room = Dungeon.LastRooms[math.random(2, #Dungeon.LastRooms)]
+    local tx = math.random(room.x + 2, room.x + room.w - 3)
+    local ty = math.random(room.y + 2, room.y + room.h - 3)
+    return tx, ty
+end
+
+-- Remove a single trap: delete its plate and drop it from the trap list.
+local function removeTrap(trap)
+    if trap.plate and IsValid(trap.plate) then
+        trap.plate:Remove()
+        table.RemoveByValue(Dungeon.Entities, trap.plate)
+    end
+    table.RemoveByValue(Dungeon.Traps, trap)
+end
+
+-- Remove a trap and spawn a fresh one of the SAME type elsewhere.
+local function relocateTrap(trap)
+    local keepType = trap.typeData
+    removeTrap(trap)
+    local tx, ty = randomTrapTile()
+    if not tx then return end
+    spawnTrap(Dungeon.Origin, tx, ty, keepType)
+end
+
 -- ── Trap Trigger (proximity-based) ───────────────────────────────────────────
 local TRAP_TRIGGER_RADIUS = 48
 timer.Create("DungeonTrapThink", 0.3, 0, function()
@@ -273,13 +303,10 @@ timer.Create("DungeonTrapThink", 0.3, 0, function()
                     ply:EmitSound("physics/metal/metal_box_impact_bullet" .. math.random(1, 3) .. ".wav", 70, 180)
                 end
 
-                -- Flash the trap plate color
+                -- Flash the plate, then move it (heal or trap) to a fresh spot.
+                -- Deferred via timer so we never mutate Dungeon.Traps mid-iteration.
                 trap.plate:SetColor(trap.color)
-                timer.Simple(0.3, function()
-                    if IsValid(trap.plate) then
-                        trap.plate:SetColor(Color(255, 255, 255))
-                    end
-                end)
+                timer.Simple(0.3, function() relocateTrap(trap) end)
             end
         end
     end
@@ -452,9 +479,16 @@ local function spawnNPCsForRoom(origin, room)
         end
 
         function npc:OnKilled(damageInfo)
-            hook.Run("OnNPCKilled", self, damageInfo:GetAttacker(), damageInfo:GetInflictor())
-            hook.Run("PlayerDeath", self, damageInfo:GetInflictor(), damageInfo:GetAttacker())
-            self:BecomeRagdoll(damageInfo)
+            -- Award the killer a point (read attacker BEFORE the NPC is removed)
+            local attacker = damageInfo:GetAttacker()
+            if IsValid(attacker) and attacker:IsPlayer() then
+                attacker:SetFrags(attacker:Frags() + 1)
+            end
+
+            -- DarkDriftNPCDeath (OnNPCKilled) spawns the ragdoll, removes this NPC,
+            -- and DungeonNPCKilled triggers the respawn wave. Fire it LAST and do
+            -- not touch `self` afterwards -- the NPC no longer exists once it runs.
+            hook.Run("OnNPCKilled", self, attacker, damageInfo:GetInflictor())
         end
 
         function npc:HandleStuck()
@@ -578,8 +612,10 @@ function Dungeon.SpawnAllNPCs(origin)
     end
 
     Dungeon.NPCs = {}
-    for _, room in ipairs(Dungeon.LastRooms) do
-        spawnNPCsForRoom(origin, room)
+    -- Skip room 1 (the spawn room) so players don't spawn inside a mob,
+    -- matching how traps and loot boxes are placed.
+    for i = 2, #Dungeon.LastRooms do
+        spawnNPCsForRoom(origin, Dungeon.LastRooms[i])
     end
 
     print(string.format("Dungeon: %d NPCs spawned.", #Dungeon.NPCs))

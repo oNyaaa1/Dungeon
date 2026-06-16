@@ -69,12 +69,10 @@ function SWEP:PrimaryAttack()
     if SERVER then
         if not IsValid(tr.Entity) then return end
         for k, target in pairs(ents.FindInSphere(tr.Entity:GetPos(), 50)) do
-            if IsValid(target) then
-                if target:IsPlayer() then
-                    target:SetHealth(target:Health() - 100)
-                else
-                    target:TakeDamage(100, pl, pl)
-                end
+            -- Skip the shooter, and use TakeDamage for everything: SetHealth on a
+            -- player just drops them to negative HP without ever killing them.
+            if IsValid(target) and target ~= pl then
+                target:TakeDamage(100, pl, pl)
             end
         end
     end
