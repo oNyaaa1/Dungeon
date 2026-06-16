@@ -24,12 +24,19 @@ local CFG = {
     },
     NPCRespawn = true,
     NPCRespawnTime = 30,
+    TrapsPerRoom = {
+        min = 1,
+        max = 5
+    },
+    TrapCooldown = 2,
+    TrapDamage = 25,
 }
 
 local PLATE_MODEL = "models/props_phx/construct/metal_plate4x4.mdl"
 Dungeon = Dungeon or {}
 Dungeon.Entities = Dungeon.Entities or {}
 Dungeon.NPCs = Dungeon.NPCs or {}
+Dungeon.Traps = Dungeon.Traps or {}
 Dungeon.SpawnPos = Dungeon.SpawnPos or {}
 Dungeon.LastRooms = Dungeon.LastRooms or {}
 Dungeon.Origin = Dungeon.Origin or Vector(0, 0, 0)
@@ -86,6 +93,122 @@ local function spawnProp(pos, ang)
     table.insert(Dungeon.Entities, ent)
     return ent
 end
+
+-- ── Trap Types ───────────────────────────────────────────────────────────────
+local TRAP_TYPES = {
+    {
+        name = "spike",
+        color = Color(180, 40, 40),
+        damage = CFG.TrapDamage,
+    },
+    {
+        name = "fire",
+        color = Color(220, 120, 20),
+        damage = CFG.TrapDamage * 0.5,
+    },
+    {
+        name = "explosive",
+        color = Color(200, 60, 0),
+        damage = CFG.TrapDamage * 1.2,
+    },
+}
+
+-- ── Trap Spawning ────────────────────────────────────────────────────────────
+local function spawnTrap(origin, tileX, tileY)
+    local trapType = TRAP_TYPES[math.random(1, #TRAP_TYPES)]
+    local wx = origin.x + tileX * CFG.TileSize
+    local wy = origin.y + tileY * CFG.TileSize
+    local gz = groundZ(Vector(wx, wy, origin.z))
+
+    -- Floor plate (looks normal until triggered)
+    local plate = spawnProp(Vector(wx, wy, gz), Angle(0, 0, 0))
+    if not IsValid(plate) then return nil end
+
+    -- Trap data
+    local trapData = {
+        pos = Vector(wx, wy, gz),
+        type = trapType.name,
+        damage = trapType.damage,
+        color = trapType.color,
+        lastTriggered = 0,
+        plate = plate,
+        tileX = tileX,
+        tileY = tileY,
+    }
+
+    table.insert(Dungeon.Traps, trapData)
+    return trapData
+end
+
+-- ── Spawn Traps For Room ────────────────────────────────────────────────────
+local function spawnTrapsForRoom(origin, room)
+    local numTraps = math.random(CFG.TrapsPerRoom.min, CFG.TrapsPerRoom.max)
+    for _ = 1, numTraps do
+        -- Pick a tile inside the room (away from edges so players walk over them)
+        local tx = math.random(room.x + 2, room.x + room.w - 3)
+        local ty = math.random(room.y + 2, room.y + room.h - 3)
+        spawnTrap(origin, tx, ty)
+    end
+end
+
+function Dungeon.SpawnAllTraps(origin)
+    Dungeon.Traps = {}
+    -- Skip the first room (index 1) — it's the spawn room
+    for i = 2, #Dungeon.LastRooms do
+        spawnTrapsForRoom(origin, Dungeon.LastRooms[i])
+    end
+    print(string.format("Dungeon: %d traps spawned.", #Dungeon.Traps))
+end
+
+-- ── Trap Trigger (proximity-based) ───────────────────────────────────────────
+local TRAP_TRIGGER_RADIUS = 48
+timer.Create("DungeonTrapThink", 0.3, 0, function()
+    if #Dungeon.Traps == 0 then return end
+    local curTime = CurTime()
+
+    for _, ply in ipairs(player.GetAll()) do
+        if not IsValid(ply) or ply:Health() <= 0 then continue end
+        local plyPos = ply:GetPos()
+
+        for i, trap in ipairs(Dungeon.Traps) do
+            if curTime - trap.lastTriggered < CFG.TrapCooldown then continue end
+            if not trap.plate or not IsValid(trap.plate) then continue end
+
+            local dx = plyPos.x - trap.pos.x
+            local dy = plyPos.y - trap.pos.y
+            local dist = math.sqrt(dx * dx + dy * dy)
+
+            if dist < TRAP_TRIGGER_RADIUS then
+                trap.lastTriggered = curTime
+
+                -- Apply damage (using ply as attacker so player_manager doesn't error)
+                local dmgInfo = DamageInfo()
+                dmgInfo:SetDamageType(DMG_SLASH)
+                dmgInfo:SetDamage(trap.damage)
+                dmgInfo:SetAttacker(ply)
+                dmgInfo:SetInflictor(trap.plate)
+                ply:TakeDamageInfo(dmgInfo)
+
+                -- Flash the trap plate color, then remove it
+                trap.plate:SetColor(trap.color)
+                timer.Simple(0.3, function()
+                    if IsValid(trap.plate) then
+                        trap.plate:SetColor(Color(255,255,255))
+                        //trap.plate:Remove()
+                        //trap.plate = nil
+                    end
+                end)
+
+                -- Visual / Sound feedback
+                local effectData = EffectData()
+                effectData:SetOrigin(plyPos + Vector(0, 0, 16))
+                effectData:SetMagnitude(trap.damage)
+                util.Effect("confetti", effectData)
+                ply:EmitSound("physics/metal/metal_box_impact_bullet" .. math.random(1, 3) .. ".wav", 70, 180)
+            end
+        end
+    end
+end)
 
 -- ── Layout ───────────────────────────────────────────────────────────────────
 function Dungeon.BuildLayout()
@@ -428,6 +551,7 @@ function Dungeon.Cleanup()
 
     Dungeon.Entities = {}
     Dungeon.NPCs = {}
+    Dungeon.Traps = {}
     Dungeon.SpawnPos = {}
     Dungeon._spawnIdx = 0
     print("Dungeon cleaned up.")
@@ -453,7 +577,8 @@ function Dungeon:Generate(origin)
     spawnRoofs(origin, tiles)
     buildSpawnPoints(origin, rooms)
     Dungeon.SpawnAllNPCs(origin)
-    print(string.format("Done: %d rooms | %d tiles | %d ents | %d NPCs | %d spawns", #rooms, #tiles, #Dungeon.Entities, #Dungeon.NPCs, #Dungeon.SpawnPos))
+    Dungeon.SpawnAllTraps(origin)
+    print(string.format("Done: %d rooms | %d tiles | %d ents | %d NPCs | %d traps | %d spawns", #rooms, #tiles, #Dungeon.Entities, #Dungeon.NPCs, #Dungeon.Traps, #Dungeon.SpawnPos))
 end
 
 -- ── Max Players ──────────────────────────────────────────────────────────────
@@ -481,6 +606,7 @@ end)
 
 concommand.Add("dungeon_cleanup", function(ply) if not IsValid(ply) or ply:IsAdmin() then Dungeon.Cleanup() end end)
 concommand.Add("dungeon_spawnnpcs", function(ply) if not IsValid(ply) or ply:IsAdmin() then Dungeon.SpawnAllNPCs(Dungeon.Origin) end end)
+concommand.Add("dungeon_respawntraps", function(ply) if not IsValid(ply) or ply:IsAdmin() then Dungeon.SpawnAllTraps(Dungeon.Origin) end end)
 concommand.Add("dungeon_info", function(ply)
     if IsValid(ply) then
         local alive = 0
@@ -488,6 +614,6 @@ concommand.Add("dungeon_info", function(ply)
             if IsValid(n) and n:Health() > 0 then alive = alive + 1 end
         end
 
-        ply:ChatPrint(string.format("Dungeon: %d rooms | %d ents | %d/%d NPCs | %d/%d players | %d spawns", #Dungeon.LastRooms, #Dungeon.Entities, alive, #Dungeon.NPCs, player.GetCount(), CFG.MaxPlayers, #Dungeon.SpawnPos))
+        ply:ChatPrint(string.format("Dungeon: %d rooms | %d ents | %d/%d NPCs | %d traps | %d/%d players | %d spawns", #Dungeon.LastRooms, #Dungeon.Entities, alive, #Dungeon.NPCs, #Dungeon.Traps, player.GetCount(), CFG.MaxPlayers, #Dungeon.SpawnPos))
     end
 end)
