@@ -19,8 +19,8 @@ local CFG = {
         },
     },
     NPCPerRoom = {
-        min = 0, // 2
-        max = 0 //5 
+        min = 2,
+        max = 5 //5 
     },
     NPCRespawn = true,
     NPCRespawnTime = 30,
