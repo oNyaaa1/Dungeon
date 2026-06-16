@@ -7,3 +7,4 @@ hook.Add("ShouldCollide", "DungeonPropCollide", function(ent1, ent2)
     -- Ragdolls should not collide with dungeon props
     if (ent1.IsProp and ent2.Ragdoll) or (ent2.IsProp and ent1.Ragdoll) then return false end
 end)
+

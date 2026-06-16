@@ -13,8 +13,9 @@ end
 hook.Add("PlayerInitialSpawn", "SetCustomCollisions", function(ply) ply:SetCustomCollisionCheck(true) end)
 hook.Add("PlayerSpawn", "SetCustomCollisions", function(ply)
     ply:SetModel("models/player/breen.mdl")
-    //ply:Give("confetti_gun")
+    --ply:Give("confetti_gun")
     ply:SetFrags(0)
+    ply:SetRunSpeed(900)
 end)
 
 hook.Add("PlayerDeath", "DarkDriftPlayerDeath", function(victim, inflictor, attacker)
@@ -42,3 +43,5 @@ hook.Add("OnNPCKilled", "DarkDriftNPCDeath", function(npc, attacker, inflictor)
     ent.Ragdoll = true
     npc:Remove()
 end)
+
+hook.Add("PlayerNoClip", "NoNoClip", function(ply) return false end)
