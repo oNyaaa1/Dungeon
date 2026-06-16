@@ -60,15 +60,22 @@ function SWEP:PrimaryAttack()
 
     if SERVER then
         local ent = tr.Entity
-        if ent:IsRagdoll() and ent:Health() <= 0 then
+        if IsValid(ent) and ent:IsRagdoll() and ent:Health() <= 0 then
             if IsValid(pl) then pl:SetFrags(pl:Frags() + 1) end
             ent:Remove()
         end
     end
 
     if SERVER then
+        if not IsValid(tr.Entity) then return end
         for k, target in pairs(ents.FindInSphere(tr.Entity:GetPos(), 50)) do
-            if IsValid(target) then target:TakeDamage(100, pl, pl) end
+            if IsValid(target) then
+                if target:IsPlayer() then
+                    target:SetHealth(target:Health() - 100)
+                else
+                    target:TakeDamage(100, pl, pl)
+                end
+            end
         end
     end
 

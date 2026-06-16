@@ -29,7 +29,7 @@ local CFG = {
         max = 5
     },
     TrapCooldown = 2,
-    TrapDamage = 25,
+    TrapDamage = 10,
 }
 
 local PLATE_MODEL = "models/props_phx/construct/metal_plate4x4.mdl"
@@ -41,6 +41,7 @@ Dungeon.SpawnPos = Dungeon.SpawnPos or {}
 Dungeon.LastRooms = Dungeon.LastRooms or {}
 Dungeon.Origin = Dungeon.Origin or Vector(0, 0, 0)
 Dungeon._spawnIdx = 0
+Dungeon.LootBoxes = Dungeon.LootBoxes or {}
 -- ── Helpers ──────────────────────────────────────────────────────────────────
 local function overlaps(a, b)
     return not (a.x + a.w + 1 <= b.x or b.x + b.w + 1 <= a.x or a.y + a.h + 1 <= b.y or b.y + b.h + 1 <= a.y)
@@ -111,6 +112,11 @@ local TRAP_TYPES = {
         color = Color(200, 60, 0),
         damage = CFG.TrapDamage * 1.2,
     },
+    {
+        name = "health",
+        color = Color(40, 200, 40),
+        heal = 25,
+    },
 }
 
 -- ── Trap Spawning ────────────────────────────────────────────────────────────
@@ -119,16 +125,21 @@ local function spawnTrap(origin, tileX, tileY)
     local wx = origin.x + tileX * CFG.TileSize
     local wy = origin.y + tileY * CFG.TileSize
     local gz = groundZ(Vector(wx, wy, origin.z))
-
     -- Floor plate (looks normal until triggered)
     local plate = spawnProp(Vector(wx, wy, gz), Angle(0, 0, 0))
     if not IsValid(plate) then return nil end
+
+    -- Health traps are visibly green so players can spot them
+    if trapType.heal then
+        plate:SetColor(trapType.color)
+    end
 
     -- Trap data
     local trapData = {
         pos = Vector(wx, wy, gz),
         type = trapType.name,
         damage = trapType.damage,
+        heal = trapType.heal,
         color = trapType.color,
         lastTriggered = 0,
         plate = plate,
@@ -157,7 +168,61 @@ function Dungeon.SpawnAllTraps(origin)
     for i = 2, #Dungeon.LastRooms do
         spawnTrapsForRoom(origin, Dungeon.LastRooms[i])
     end
+
     print(string.format("Dungeon: %d traps spawned.", #Dungeon.Traps))
+end
+
+-- ── Loot Boxes ───────────────────────────────────────────────────────────────
+local LOOT_BOXES_PER_ROOM = {
+    min = 1,
+    max = 2,
+}
+
+-- Unique loot tables per box (could be expanded later)
+local function buildLootTable()
+    return {
+        {weapon = "confetti_gun", weight = 100},
+    }
+end
+
+local function spawnBox(origin, tileX, tileY)
+    local wx = origin.x + tileX * CFG.TileSize
+    local wy = origin.y + tileY * CFG.TileSize
+    local gz = groundZ(Vector(wx, wy, origin.z))
+
+    local ent = ents.Create("box")
+    if not IsValid(ent) then return nil end
+
+    ent:SetPos(Vector(wx, wy, gz + 5))
+    ent:Spawn()
+    ent:Activate()
+
+    table.insert(Dungeon.LootBoxes, ent)
+    return ent
+end
+
+local function spawnBoxesForRoom(origin, room)
+    local numBoxes = math.random(LOOT_BOXES_PER_ROOM.min, LOOT_BOXES_PER_ROOM.max)
+    for _ = 1, numBoxes do
+        local tx = math.random(room.x + 1, room.x + room.w - 2)
+        local ty = math.random(room.y + 1, room.y + room.h - 2)
+        spawnBox(origin, tx, ty)
+    end
+end
+
+function Dungeon.SpawnAllLootBoxes(origin)
+    -- Remove existing boxes
+    for _, box in ipairs(Dungeon.LootBoxes) do
+        if IsValid(box) then box:Remove() end
+    end
+    Dungeon.LootBoxes = {}
+
+    -- Spawn in all rooms except the first (spawn room)
+    for i = 2, #Dungeon.LastRooms do
+        spawnBoxesForRoom(origin, Dungeon.LastRooms[i])
+    end
+
+    print(string.format("Dungeon: %d loot boxes spawned.", #Dungeon.LootBoxes))
 end
 
 -- ── Trap Trigger (proximity-based) ───────────────────────────────────────────
@@ -165,46 +230,56 @@ local TRAP_TRIGGER_RADIUS = 48
 timer.Create("DungeonTrapThink", 0.3, 0, function()
     if #Dungeon.Traps == 0 then return end
     local curTime = CurTime()
-
     for _, ply in ipairs(player.GetAll()) do
         if not IsValid(ply) or ply:Health() <= 0 then continue end
         local plyPos = ply:GetPos()
-
         for i, trap in ipairs(Dungeon.Traps) do
             if curTime - trap.lastTriggered < CFG.TrapCooldown then continue end
             if not trap.plate or not IsValid(trap.plate) then continue end
-
             local dx = plyPos.x - trap.pos.x
             local dy = plyPos.y - trap.pos.y
             local dist = math.sqrt(dx * dx + dy * dy)
-
             if dist < TRAP_TRIGGER_RADIUS then
                 trap.lastTriggered = curTime
+                local effectData = EffectData()
+                effectData:SetOrigin(plyPos + Vector(0, 0, 16))
 
-                -- Apply damage (using ply as attacker so player_manager doesn't error)
-                local dmgInfo = DamageInfo()
-                dmgInfo:SetDamageType(DMG_SLASH)
-                dmgInfo:SetDamage(trap.damage)
-                dmgInfo:SetAttacker(ply)
-                dmgInfo:SetInflictor(trap.plate)
-                ply:TakeDamageInfo(dmgInfo)
+                if trap.heal then
+                    -- Health trap: heal the player
+                    local newHealth = math.min(ply:Health() + trap.heal, ply:GetMaxHealth())
+                    ply:SetHealth(newHealth)
+                    ply:EmitSound("vo/ravenholm/monk_givehealth01.wav", 75, 100)
+                    effectData:SetMagnitude(trap.heal)
+                    util.Effect("confetti", effectData)
 
-                -- Flash the trap plate color, then remove it
+                    -- Spawn a loot box in a random room
+                    if #Dungeon.LastRooms > 1 then
+                        local room = Dungeon.LastRooms[math.random(2, #Dungeon.LastRooms)]
+                        local tx = math.random(room.x + 1, room.x + room.w - 2)
+                        local ty = math.random(room.y + 1, room.y + room.h - 2)
+                        spawnBox(Dungeon.Origin, tx, ty)
+                        ply:ChatPrint("A reward box appeared somewhere in the dungeon!")
+                    end
+                else
+                    -- Damage trap: hurts the player
+                    local dmgInfo = DamageInfo()
+                    dmgInfo:SetDamageType(DMG_SLASH)
+                    dmgInfo:SetDamage(trap.damage)
+                    dmgInfo:SetAttacker(ply)
+                    dmgInfo:SetInflictor(trap.plate)
+                    ply:TakeDamageInfo(dmgInfo)
+                    effectData:SetMagnitude(trap.damage)
+                    util.Effect("confetti", effectData)
+                    ply:EmitSound("physics/metal/metal_box_impact_bullet" .. math.random(1, 3) .. ".wav", 70, 180)
+                end
+
+                -- Flash the trap plate color
                 trap.plate:SetColor(trap.color)
                 timer.Simple(0.3, function()
                     if IsValid(trap.plate) then
-                        trap.plate:SetColor(Color(255,255,255))
-                        //trap.plate:Remove()
-                        //trap.plate = nil
+                        trap.plate:SetColor(Color(255, 255, 255))
                     end
                 end)
-
-                -- Visual / Sound feedback
-                local effectData = EffectData()
-                effectData:SetOrigin(plyPos + Vector(0, 0, 16))
-                effectData:SetMagnitude(trap.damage)
-                util.Effect("confetti", effectData)
-                ply:EmitSound("physics/metal/metal_box_impact_bullet" .. math.random(1, 3) .. ".wav", 70, 180)
             end
         end
     end
@@ -578,7 +653,8 @@ function Dungeon:Generate(origin)
     buildSpawnPoints(origin, rooms)
     Dungeon.SpawnAllNPCs(origin)
     Dungeon.SpawnAllTraps(origin)
-    print(string.format("Done: %d rooms | %d tiles | %d ents | %d NPCs | %d traps | %d spawns", #rooms, #tiles, #Dungeon.Entities, #Dungeon.NPCs, #Dungeon.Traps, #Dungeon.SpawnPos))
+    Dungeon.SpawnAllLootBoxes(origin)
+    print(string.format("Done: %d rooms | %d tiles | %d ents | %d NPCs | %d traps | %d boxes | %d spawns", #rooms, #tiles, #Dungeon.Entities, #Dungeon.NPCs, #Dungeon.Traps, #Dungeon.LootBoxes, #Dungeon.SpawnPos))
 end
 
 -- ── Max Players ──────────────────────────────────────────────────────────────
