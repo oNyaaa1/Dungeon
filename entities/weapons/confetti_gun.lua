@@ -72,7 +72,7 @@ function SWEP:PrimaryAttack()
             -- Skip the shooter, and use TakeDamage for everything: SetHealth on a
             -- player just drops them to negative HP without ever killing them.
             if IsValid(target) and target ~= pl then
-                target:TakeDamage(1000, pl, pl)
+                target:TakeDamage(100, pl, pl)
             end
         end
     end
