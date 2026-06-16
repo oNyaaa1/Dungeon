@@ -452,9 +452,16 @@ local function spawnNPCsForRoom(origin, room)
         end
 
         function npc:OnKilled(damageInfo)
-            hook.Run("OnNPCKilled", self, damageInfo:GetAttacker(), damageInfo:GetInflictor())
-            hook.Run("PlayerDeath", self, damageInfo:GetInflictor(), damageInfo:GetAttacker())
-            self:BecomeRagdoll(damageInfo)
+            -- Award the killer a point (read attacker BEFORE the NPC is removed)
+            local attacker = damageInfo:GetAttacker()
+            if IsValid(attacker) and attacker:IsPlayer() then
+                attacker:SetFrags(attacker:Frags() + 1)
+            end
+
+            -- DarkDriftNPCDeath (OnNPCKilled) spawns the ragdoll, removes this NPC,
+            -- and DungeonNPCKilled triggers the respawn wave. Fire it LAST and do
+            -- not touch `self` afterwards -- the NPC no longer exists once it runs.
+            hook.Run("OnNPCKilled", self, attacker, damageInfo:GetInflictor())
         end
 
         function npc:HandleStuck()
@@ -578,8 +585,10 @@ function Dungeon.SpawnAllNPCs(origin)
     end
 
     Dungeon.NPCs = {}
-    for _, room in ipairs(Dungeon.LastRooms) do
-        spawnNPCsForRoom(origin, room)
+    -- Skip room 1 (the spawn room) so players don't spawn inside a mob,
+    -- matching how traps and loot boxes are placed.
+    for i = 2, #Dungeon.LastRooms do
+        spawnNPCsForRoom(origin, Dungeon.LastRooms[i])
     end
 
     print(string.format("Dungeon: %d NPCs spawned.", #Dungeon.NPCs))

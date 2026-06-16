@@ -1,7 +1,7 @@
 AddCSLuaFile()
-DEFINE_BASECLASS("base_entity")
+DEFINE_BASECLASS("base_anim")
 ENT.Type = "anim"
-ENT.Base = "base_entity"
+ENT.Base = "base_anim"
 ENT.PrintName = "Loot Box"
 ENT.Category = "Dark Drift"
 ENT.Spawnable = true
@@ -87,11 +87,31 @@ end
 -- CLIENT
 -- ═══════════════════════════════════════════════════════
 if CLIENT then
+	surface.CreateFont("DarkDriftLootTip", {
+		font = "Roboto",
+		size = 48,
+		weight = 700,
+		antialias = true,
+	})
+
+	local DRAW_DIST_SQR = 220 * 220 -- only show the prompt when a player is close
 	function ENT:Draw()
 		self:DrawModel()
-	end
-
-	function ENT:Think()
-		AddWorldTip(nil, "Press [e] to pick up!", nil, self:GetPos(), self)
+		local pos = self:GetPos() + self:GetUp() * 28
+		local eyePos = EyePos()
+		if eyePos:DistToSqr(pos) > DRAW_DIST_SQR then return end
+		-- Billboard the text so it always faces the player
+		local ang = (pos - eyePos):Angle()
+		ang:RotateAroundAxis(ang:Up(), -90)
+		ang:RotateAroundAxis(ang:Forward(), 90)
+		-- Show whatever key is actually bound to +use (falls back to E)
+		local useKey = (input.LookupBinding("+use") or "E"):upper()
+		local text = "Open with [" .. useKey .. "]"
+		cam.Start3D2D(pos, ang, 0.1)
+		surface.SetFont("DarkDriftLootTip")
+		local tw, th = surface.GetTextSize(text)
+		draw.RoundedBox(8, -tw * 0.5 - 16, -th * 0.5 - 8, tw + 32, th + 16, Color(0, 0, 0, 200))
+		draw.SimpleText(text, "DarkDriftLootTip", 0, 0, Color(250, 250, 200), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		cam.End3D2D()
 	end
 end
