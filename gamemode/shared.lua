@@ -8,3 +8,12 @@ hook.Add("ShouldCollide", "DungeonPropCollide", function(ent1, ent2)
     if (ent1.IsProp and ent2.Ragdoll) or (ent2.IsProp and ent1.Ragdoll) then return false end
 end)
 
+local PLAYER = FindMetaTable("Player")
+
+function PLAYER:SetRoomDepth(name, number)
+    self:SetNWInt("DungeonRoomNumber", number or 0)
+end
+
+function PLAYER:GetRoomDepth()
+    return self:GetNWInt("DungeonRoomNumber", 0)
+end

@@ -378,6 +378,7 @@ function Dungeon.Refresh()
     for _, ply in ipairs(player.GetAll()) do
         if IsValid(ply) then
             ply:ChatPrint("The Dark Drift shifts... you descend to depth " .. Dungeon.Depth .. "!")
+            ply:SetRoomDepth("room", Dungeon.Depth)
             ply:EmitSound("ambient/levels/labs/electric_explosion" .. math.random(1, 5) .. ".wav", 75, 100)
             Dungeon:Generate(ply, Dungeon.Origin)
         end

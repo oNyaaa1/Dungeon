@@ -23,9 +23,11 @@ end
 
 hook.Add("PlayerInitialSpawn", "SetCustomCollisions", function(ply) ply:SetCustomCollisionCheck(true) end)
 hook.Add("PlayerSpawn", "SetCustomCollisions", function(ply)
-    ply:SetModel("models/player/breen.mdl")
-    ply:SetFrags(0)
-    ply:SetRunSpeed(900)
+    if IsValid(ply) then
+        ply:SetModel("models/player/breen.mdl")
+        ply:SetFrags(0)
+        ply:SetRunSpeed(900)
+    end
 end)
 
 hook.Add("PlayerDeath", "DarkDriftPlayerDeath", function(victim, inflictor, attacker)
