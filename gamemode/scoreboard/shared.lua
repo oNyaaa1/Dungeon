@@ -28,7 +28,7 @@ else
         likable:SetImage("darkdrift/skeleton.png")
         ScoreBoard.sb3 = vgui.Create("DPanel", ScoreBoard.sb)
         ScoreBoard.sb3:Dock(LEFT)
-        ScoreBoard.sb3:SetWide(150)
+        ScoreBoard.sb3:SetWide(110)
         ScoreBoard.sb3.Paint = function(s, w, h)
             draw.RoundedBox(0, 0, 0, w, h, Color(255, 255, 255, 255))
             draw.DrawText("Name", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
@@ -37,7 +37,7 @@ else
         ScoreBoard.sb32 = vgui.Create("DPanel", ScoreBoard.sb3)
         ScoreBoard.sb32:Dock(LEFT)
         ScoreBoard.sb32:DockMargin(0, 25, 0, 0)
-        ScoreBoard.sb32:SetWide(150)
+        ScoreBoard.sb32:SetWide(110)
         ScoreBoard.sb32.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, Color(120, 120, 120, 255)) end
         for k, name in pairs(player.GetAll()) do
             ScoreBoard.dbutton = vgui.Create("DButton", ScoreBoard.sb32)
@@ -53,7 +53,7 @@ else
 
         ScoreBoard.sb3232 = vgui.Create("DPanel", ScoreBoard.sb)
         ScoreBoard.sb3232:Dock(LEFT)
-        ScoreBoard.sb3232:SetWide(150)
+        ScoreBoard.sb3232:SetWide(110)
         ScoreBoard.sb3232.Paint = function(s, w, h)
             draw.RoundedBox(0, 0, 0, w, h, Color(255, 255, 255, 255))
             draw.DrawText("Health", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
@@ -62,7 +62,7 @@ else
         ScoreBoard.sb324 = vgui.Create("DPanel", ScoreBoard.sb3232)
         ScoreBoard.sb324:Dock(LEFT)
         ScoreBoard.sb324:DockMargin(0, 25, 0, 0)
-        ScoreBoard.sb324:SetWide(150)
+        ScoreBoard.sb324:SetWide(110)
         ScoreBoard.sb324.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, Color(120, 120, 120, 255)) end
         for k, name in pairs(player.GetAll()) do
             ScoreBoard.dbutton = vgui.Create("DButton", ScoreBoard.sb324)
@@ -78,7 +78,7 @@ else
 
         ScoreBoard.bctimer = vgui.Create("DPanel", ScoreBoard.sb)
         ScoreBoard.bctimer:Dock(LEFT)
-        ScoreBoard.bctimer:SetWide(150)
+        ScoreBoard.bctimer:SetWide(110)
         ScoreBoard.bctimer.Paint = function(s, w, h)
             draw.RoundedBox(0, 0, 0, w, h, Color(255, 255, 255, 255))
             draw.DrawText("Time", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
@@ -103,9 +103,34 @@ else
             ScoreBoard.dbutton:SetText("")
         end
 
+        ScoreBoard.roomdepth = vgui.Create("DPanel", ScoreBoard.sb)
+        ScoreBoard.roomdepth:Dock(LEFT)
+        ScoreBoard.roomdepth:SetWide(110)
+        ScoreBoard.roomdepth.Paint = function(s, w, h)
+            draw.RoundedBox(0, 0, 0, w, h, Color(255, 255, 255, 255))
+            draw.DrawText("Depth", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
+        end
+
+        ScoreBoard.roomdepth1 = vgui.Create("DPanel", ScoreBoard.roomdepth)
+        ScoreBoard.roomdepth1:Dock(LEFT)
+        ScoreBoard.roomdepth1:DockMargin(0, 25, 0, 0)
+        ScoreBoard.roomdepth1:SetWide(110)
+        ScoreBoard.roomdepth1.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, Color(120, 120, 120, 255)) end
+        for k, name in pairs(player.GetAll()) do
+            ScoreBoard.dbutton = vgui.Create("DButton", ScoreBoard.roomdepth1)
+            ScoreBoard.dbutton:Dock(TOP)
+            ScoreBoard.dbutton:SizeToContents()
+            ScoreBoard.dbutton.Paint = function(s, w, h)
+                draw.RoundedBox(0, 0, 0, w, h, Color(52, 52, 52, 0))
+                draw.DrawText(tostring(name:GetRoomDepth()) or 0, "DarkDrift", 0, 0, Color(255, 255, 255, 255), TEXT_ALIGN_LEFT)
+            end
+
+            ScoreBoard.dbutton:SetText("")
+        end
+
         ScoreBoard.sb4 = vgui.Create("DPanel", ScoreBoard.sb)
         ScoreBoard.sb4:Dock(LEFT)
-        ScoreBoard.sb4:SetWide(150)
+        ScoreBoard.sb4:SetWide(110)
         ScoreBoard.sb4.Paint = function(s, w, h)
             draw.RoundedBox(0, 0, 0, w, h, Color(255, 255, 255, 255))
             draw.DrawText("Kills", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
@@ -114,7 +139,7 @@ else
         ScoreBoard.sb42 = vgui.Create("DPanel", ScoreBoard.sb4)
         ScoreBoard.sb42:Dock(LEFT)
         ScoreBoard.sb42:DockMargin(0, 25, 0, 0)
-        ScoreBoard.sb42:SetWide(150)
+        ScoreBoard.sb42:SetWide(110)
         ScoreBoard.sb42.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, Color(120, 120, 120, 255)) end
         for k, name in pairs(player.GetAll()) do
             ScoreBoard.dbutton = vgui.Create("DButton", ScoreBoard.sb42)
@@ -130,7 +155,7 @@ else
 
         ScoreBoard.sb5 = vgui.Create("DPanel", ScoreBoard.sb)
         ScoreBoard.sb5:Dock(LEFT)
-        ScoreBoard.sb5:SetWide(150)
+        ScoreBoard.sb5:SetWide(110)
         ScoreBoard.sb5.Paint = function(s, w, h)
             draw.RoundedBox(0, 0, 0, w, h, Color(255, 255, 255, 255))
             draw.DrawText("Deaths", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
@@ -164,7 +189,7 @@ else
         ScoreBoard.sb62 = vgui.Create("DPanel", ScoreBoard.sb6)
         ScoreBoard.sb62:Dock(LEFT)
         ScoreBoard.sb62:DockMargin(0, 25, 0, 0)
-        ScoreBoard.sb62:SetWide(200)
+        ScoreBoard.sb62:SetWide(140)
         ScoreBoard.sb62.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, Color(120, 120, 120, 255)) end
         for k, name in pairs(player.GetAll()) do
             ScoreBoard.dbutton = vgui.Create("DButton", ScoreBoard.sb62)
