@@ -20,7 +20,7 @@ local CFG = {
     },
     NPCPerRoom = {
         min = 2,
-        max = 5 //5 
+        max = 5 --5 
     },
     NPCRespawn = true,
     NPCRespawnTime = 30,
@@ -30,6 +30,11 @@ local CFG = {
     },
     TrapCooldown = 2,
     TrapDamage = 10,
+    HealingPerRoom = {
+        min = 0,
+        max = 1
+    },
+    HealAmount = 15,
 }
 
 local PLATE_MODEL = "models/props_phx/construct/metal_plate4x4.mdl"
@@ -42,6 +47,7 @@ Dungeon.LastRooms = Dungeon.LastRooms or {}
 Dungeon.Origin = Dungeon.Origin or Vector(0, 0, 0)
 Dungeon._spawnIdx = 0
 Dungeon.LootBoxes = Dungeon.LootBoxes or {}
+Dungeon.Healing = Dungeon.Healing or {}
 -- ── Helpers ──────────────────────────────────────────────────────────────────
 local function overlaps(a, b)
     return not (a.x + a.w + 1 <= b.x or b.x + b.w + 1 <= a.x or a.y + a.h + 1 <= b.y or b.y + b.h + 1 <= a.y)
@@ -129,12 +135,8 @@ local function spawnTrap(origin, tileX, tileY, forcedType)
     -- Floor plate (looks normal until triggered)
     local plate = spawnProp(Vector(wx, wy, gz), Angle(0, 0, 0))
     if not IsValid(plate) then return nil end
-
     -- Health traps are visibly green so players can spot them
-    if trapType.heal then
-        plate:SetColor(trapType.color)
-    end
-
+    if trapType.heal then plate:SetColor(trapType.color) end
     -- Trap data
     local trapData = {
         pos = Vector(wx, wy, gz),
@@ -183,7 +185,10 @@ local LOOT_BOXES_PER_ROOM = {
 -- Unique loot tables per box (could be expanded later)
 local function buildLootTable()
     return {
-        {weapon = "confetti_gun", weight = 100},
+        {
+            weapon = "confetti_gun",
+            weight = 100
+        },
     }
 end
 
@@ -191,14 +196,11 @@ local function spawnBox(origin, tileX, tileY)
     local wx = origin.x + tileX * CFG.TileSize
     local wy = origin.y + tileY * CFG.TileSize
     local gz = groundZ(Vector(wx, wy, origin.z))
-
     local ent = ents.Create("box")
     if not IsValid(ent) then return nil end
-
     ent:SetPos(Vector(wx, wy, gz + 5))
     ent:Spawn()
     ent:Activate()
-
     table.insert(Dungeon.LootBoxes, ent)
     return ent
 end
@@ -217,8 +219,8 @@ function Dungeon.SpawnAllLootBoxes(origin)
     for _, box in ipairs(Dungeon.LootBoxes) do
         if IsValid(box) then box:Remove() end
     end
-    Dungeon.LootBoxes = {}
 
+    Dungeon.LootBoxes = {}
     -- Spawn in all rooms except the first (spawn room)
     for i = 2, #Dungeon.LastRooms do
         spawnBoxesForRoom(origin, Dungeon.LastRooms[i])
@@ -226,6 +228,99 @@ function Dungeon.SpawnAllLootBoxes(origin)
 
     print(string.format("Dungeon: %d loot boxes spawned.", #Dungeon.LootBoxes))
 end
+
+-- ── Healing Pads ─────────────────────────────────────────────────────────────
+local HEAL_TRIGGER_RADIUS = 48
+local HEAL_COLOR = Color(40, 200, 40)
+local function spawnHealing(origin, tileX, tileY)
+    local wx = origin.x + tileX * CFG.TileSize
+    local wy = origin.y + tileY * CFG.TileSize
+    local gz = groundZ(Vector(wx, wy, origin.z))
+    local plate = spawnProp(Vector(wx, wy, gz), Angle(0, 0, 0))
+    if not IsValid(plate) then return nil end
+    plate:SetColor(HEAL_COLOR) -- visibly green so players can spot it
+    local padData = {
+        pos = Vector(wx, wy, gz),
+        amount = CFG.HealAmount,
+        plate = plate,
+        consumed = false,
+        tileX = tileX,
+        tileY = tileY,
+    }
+
+    table.insert(Dungeon.Healing, padData)
+    return padData
+end
+
+local function spawnHealingForRoom(origin, room)
+    local num = math.random(CFG.HealingPerRoom.min, CFG.HealingPerRoom.max)
+    for _ = 0, num do
+        -- Keep away from edges so players actually walk over them
+        local tx = math.random(room.x + 2, room.x + room.w - 3)
+        local ty = math.random(room.y + 2, room.y + room.h - 3)
+        spawnHealing(origin, tx, ty)
+    end
+end
+
+function Dungeon.SpawnAllHealing(origin)
+    -- Remove existing pads (their plates are also tracked in Dungeon.Entities)
+    for _, pad in ipairs(Dungeon.Healing) do
+        if pad.plate and IsValid(pad.plate) then
+            pad.plate:Remove()
+            table.RemoveByValue(Dungeon.Entities, pad.plate)
+        end
+    end
+
+    Dungeon.Healing = {}
+    -- Skip room 1 (the spawn room), matching traps / loot boxes
+    for i = 2, #Dungeon.LastRooms do
+        spawnHealingForRoom(origin, Dungeon.LastRooms[i])
+    end
+
+    print(string.format("Dungeon: %d healing pads spawned.", #Dungeon.Healing))
+end
+
+-- Remove a single healing pad: delete its plate and drop it from the list.
+local function removeHealing(pad)
+    if pad.plate and IsValid(pad.plate) then
+        pad.plate:Remove()
+        table.RemoveByValue(Dungeon.Entities, pad.plate)
+    end
+
+    table.RemoveByValue(Dungeon.Healing, pad)
+end
+
+-- ── Healing Trigger (proximity-based) ─────────────────────────────────────────
+timer.Create("DungeonHealingThink", 0.3, 0, function()
+    if #Dungeon.Healing == 0 then return end
+    for _, ply in ipairs(player.GetAll()) do
+        if not IsValid(ply) or ply:Health() <= 0 then continue end
+        local plyPos = ply:GetPos()
+        for _, pad in ipairs(Dungeon.Healing) do
+            if pad.consumed then continue end
+            if not pad.plate or not IsValid(pad.plate) then continue end
+            if ply:Health() >= ply:GetMaxHealth() then -- already full
+                continue
+            end
+
+            local dx = plyPos.x - pad.pos.x
+            local dy = plyPos.y - pad.pos.y
+            if math.sqrt(dx * dx + dy * dy) < HEAL_TRIGGER_RADIUS then
+                pad.consumed = true -- guard so it can't fire twice before removal
+                local newHealth = math.min(ply:Health() + pad.amount, ply:GetMaxHealth())
+                ply:SetHealth(newHealth)
+                ply:EmitSound("vo/ravenholm/monk_givehealth01.wav", 75, 100)
+                local effectData = EffectData()
+                effectData:SetOrigin(plyPos + Vector(0, 0, 16))
+                effectData:SetMagnitude(pad.amount)
+                util.Effect("confetti", effectData)
+                -- Vanish after healing. Deferred via timer so we never mutate
+                -- Dungeon.Healing mid-iteration.
+                timer.Simple(0, function() removeHealing(pad) end)
+            end
+        end
+    end
+end)
 
 -- ── Trap Relocation ──────────────────────────────────────────────────────────
 -- Pick a random interior tile in a random non-spawn room.
@@ -243,6 +338,7 @@ local function removeTrap(trap)
         trap.plate:Remove()
         table.RemoveByValue(Dungeon.Entities, trap.plate)
     end
+
     table.RemoveByValue(Dungeon.Traps, trap)
 end
 
@@ -273,7 +369,6 @@ timer.Create("DungeonTrapThink", 0.3, 0, function()
                 trap.lastTriggered = curTime
                 local effectData = EffectData()
                 effectData:SetOrigin(plyPos + Vector(0, 0, 16))
-
                 if trap.heal then
                     -- Health trap: heal the player
                     local newHealth = math.min(ply:Health() + trap.heal, ply:GetMaxHealth())
@@ -281,7 +376,6 @@ timer.Create("DungeonTrapThink", 0.3, 0, function()
                     ply:EmitSound("vo/ravenholm/monk_givehealth01.wav", 75, 100)
                     effectData:SetMagnitude(trap.heal)
                     util.Effect("confetti", effectData)
-
                     -- Spawn a loot box in a random room
                     if #Dungeon.LastRooms > 1 then
                         local room = Dungeon.LastRooms[math.random(2, #Dungeon.LastRooms)]
@@ -481,10 +575,7 @@ local function spawnNPCsForRoom(origin, room)
         function npc:OnKilled(damageInfo)
             -- Award the killer a point (read attacker BEFORE the NPC is removed)
             local attacker = damageInfo:GetAttacker()
-            if IsValid(attacker) and attacker:IsPlayer() then
-                attacker:SetFrags(attacker:Frags() + 1)
-            end
-
+            if IsValid(attacker) and attacker:IsPlayer() then attacker:SetFrags(attacker:Frags() + 1) end
             -- DarkDriftNPCDeath (OnNPCKilled) spawns the ragdoll, removes this NPC,
             -- and DungeonNPCKilled triggers the respawn wave. Fire it LAST and do
             -- not touch `self` afterwards -- the NPC no longer exists once it runs.
@@ -663,6 +754,7 @@ function Dungeon.Cleanup()
     Dungeon.Entities = {}
     Dungeon.NPCs = {}
     Dungeon.Traps = {}
+    Dungeon.Healing = {}
     Dungeon.SpawnPos = {}
     Dungeon._spawnIdx = 0
     print("Dungeon cleaned up.")
@@ -690,7 +782,8 @@ function Dungeon:Generate(origin)
     Dungeon.SpawnAllNPCs(origin)
     Dungeon.SpawnAllTraps(origin)
     Dungeon.SpawnAllLootBoxes(origin)
-    print(string.format("Done: %d rooms | %d tiles | %d ents | %d NPCs | %d traps | %d boxes | %d spawns", #rooms, #tiles, #Dungeon.Entities, #Dungeon.NPCs, #Dungeon.Traps, #Dungeon.LootBoxes, #Dungeon.SpawnPos))
+    Dungeon.SpawnAllHealing(origin)
+    print(string.format("Done: %d rooms | %d tiles | %d ents | %d NPCs | %d traps | %d boxes | %d heals | %d spawns", #rooms, #tiles, #Dungeon.Entities, #Dungeon.NPCs, #Dungeon.Traps, #Dungeon.LootBoxes, #Dungeon.Healing, #Dungeon.SpawnPos))
 end
 
 -- ── Max Players ──────────────────────────────────────────────────────────────
@@ -719,6 +812,7 @@ end)
 concommand.Add("dungeon_cleanup", function(ply) if not IsValid(ply) or ply:IsAdmin() then Dungeon.Cleanup() end end)
 concommand.Add("dungeon_spawnnpcs", function(ply) if not IsValid(ply) or ply:IsAdmin() then Dungeon.SpawnAllNPCs(Dungeon.Origin) end end)
 concommand.Add("dungeon_respawntraps", function(ply) if not IsValid(ply) or ply:IsAdmin() then Dungeon.SpawnAllTraps(Dungeon.Origin) end end)
+concommand.Add("dungeon_respawnhealing", function(ply) if not IsValid(ply) or ply:IsAdmin() then Dungeon.SpawnAllHealing(Dungeon.Origin) end end)
 concommand.Add("dungeon_info", function(ply)
     if IsValid(ply) then
         local alive = 0
@@ -726,6 +820,6 @@ concommand.Add("dungeon_info", function(ply)
             if IsValid(n) and n:Health() > 0 then alive = alive + 1 end
         end
 
-        ply:ChatPrint(string.format("Dungeon: %d rooms | %d ents | %d/%d NPCs | %d traps | %d/%d players | %d spawns", #Dungeon.LastRooms, #Dungeon.Entities, alive, #Dungeon.NPCs, #Dungeon.Traps, player.GetCount(), CFG.MaxPlayers, #Dungeon.SpawnPos))
+        ply:ChatPrint(string.format("Dungeon: %d rooms | %d ents | %d/%d NPCs | %d traps | %d heals | %d/%d players | %d spawns", #Dungeon.LastRooms, #Dungeon.Entities, alive, #Dungeon.NPCs, #Dungeon.Traps, #Dungeon.Healing, player.GetCount(), CFG.MaxPlayers, #Dungeon.SpawnPos))
     end
 end)

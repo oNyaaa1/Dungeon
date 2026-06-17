@@ -6,6 +6,7 @@ else
         weight = 700
     })
 
+    net.Receive("BreadCrumbs_Timer", function() LocalPlayer().timer = net.ReadFloat() end)
     local ScoreBoard = {}
     function ScoreBoard:Show()
         ScoreBoard.sb = vgui.Create("DPanel")
@@ -52,7 +53,7 @@ else
 
         ScoreBoard.sb3232 = vgui.Create("DPanel", ScoreBoard.sb)
         ScoreBoard.sb3232:Dock(LEFT)
-        ScoreBoard.sb3232:SetWide(200)
+        ScoreBoard.sb3232:SetWide(150)
         ScoreBoard.sb3232.Paint = function(s, w, h)
             draw.RoundedBox(0, 0, 0, w, h, Color(255, 255, 255, 255))
             draw.DrawText("Health", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
@@ -61,7 +62,7 @@ else
         ScoreBoard.sb324 = vgui.Create("DPanel", ScoreBoard.sb3232)
         ScoreBoard.sb324:Dock(LEFT)
         ScoreBoard.sb324:DockMargin(0, 25, 0, 0)
-        ScoreBoard.sb324:SetWide(200)
+        ScoreBoard.sb324:SetWide(150)
         ScoreBoard.sb324.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, Color(120, 120, 120, 255)) end
         for k, name in pairs(player.GetAll()) do
             ScoreBoard.dbutton = vgui.Create("DButton", ScoreBoard.sb324)
@@ -70,6 +71,33 @@ else
             ScoreBoard.dbutton.Paint = function(s, w, h)
                 draw.RoundedBox(0, 0, 0, w, h, Color(52, 52, 52, 0))
                 draw.DrawText(tostring(name:Health()), "DarkDrift", 0, 0, Color(255, 255, 255, 255), TEXT_ALIGN_LEFT)
+            end
+
+            ScoreBoard.dbutton:SetText("")
+        end
+
+        ScoreBoard.bctimer = vgui.Create("DPanel", ScoreBoard.sb)
+        ScoreBoard.bctimer:Dock(LEFT)
+        ScoreBoard.bctimer:SetWide(150)
+        ScoreBoard.bctimer.Paint = function(s, w, h)
+            draw.RoundedBox(0, 0, 0, w, h, Color(255, 255, 255, 255))
+            draw.DrawText("Time", "DarkDrift", 0, 0, Color(0, 0, 0, 255), TEXT_ALIGN_LEFT)
+        end
+
+        ScoreBoard.bctimer1 = vgui.Create("DPanel", ScoreBoard.bctimer)
+        ScoreBoard.bctimer1:Dock(LEFT)
+        ScoreBoard.bctimer1:DockMargin(0, 25, 0, 0)
+        ScoreBoard.bctimer1:SetWide(200)
+        ScoreBoard.bctimer1.Paint = function(s, w, h) draw.RoundedBox(0, 0, 0, w, h, Color(120, 120, 120, 255)) end
+        for k, name in pairs(player.GetAll()) do
+            ScoreBoard.dbutton = vgui.Create("DButton", ScoreBoard.bctimer1)
+            ScoreBoard.dbutton:Dock(TOP)
+            ScoreBoard.dbutton:SizeToContents()
+            ScoreBoard.dbutton.Paint = function(s, w, h)
+                draw.RoundedBox(0, 0, 0, w, h, Color(52, 52, 52, 0))
+                local t = string.FormattedTime(name.timer)
+                local str = string.format("%02i:%02i:%02i:%02i", t.h, t.m, t.s, t.ms)
+                draw.DrawText(tostring(str), "DarkDrift", 0, 0, Color(255, 255, 255, 255), TEXT_ALIGN_LEFT)
             end
 
             ScoreBoard.dbutton:SetText("")

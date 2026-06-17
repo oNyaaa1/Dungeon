@@ -12,6 +12,7 @@ include(DungeonGenerate .. "shared.lua")
 AddCSLuaFile(DungeonGenerate .. "shared.lua")
 local DungeonGenerate = "hud/"
 AddCSLuaFile(DungeonGenerate .. "cl_init.lua")
+include(DungeonGenerate .. "init.lua")
 for k, v in pairs(file.Find("sound/darkdrift/" .. "*", "GAME")) do
     resource.AddFile("sound/darkdrift/" .. v)
 end
