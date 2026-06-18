@@ -889,6 +889,7 @@ hook.Add("PlayerSpawn", "DungeonGen", function(ply)
         ply:SetRoomDepth("room", 0)
     else
         timer.Simple(0.1, function() if IsValid(ply) and #Dungeon.SpawnPos > 0 then ply:SetPos(Dungeon.GetSpawnPos()) end end)
+        ply:SetRoomDepth("room", 0)
     end
 end)
 
