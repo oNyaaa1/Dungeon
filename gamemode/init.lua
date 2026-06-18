@@ -1,9 +1,9 @@
 AddCSLuaFile("shared.lua")
 AddCSLuaFile("cl_init.lua")
 include("shared.lua")
-local DungeonGenerate = "dungeongenerate/"
+local DungeonGenerate = "dungeongen/"
 include(DungeonGenerate .. "init.lua")
-local DungeonGenerate = "inventory/"
+local DungeonGenerate = "ninventory/"
 AddCSLuaFile(DungeonGenerate .. "cl_init.lua")
 include(DungeonGenerate .. "init.lua")
 AddCSLuaFile(DungeonGenerate .. "threegrid.lua")
