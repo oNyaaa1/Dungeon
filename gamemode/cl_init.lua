@@ -1,5 +1,5 @@
 include("shared.lua")
-local DungeonGenerate = "Inventory/"
+local DungeonGenerate = "inventory/"
 include(DungeonGenerate .. "cl_init.lua")
 include(DungeonGenerate .. "threegrid.lua")
 local DungeonGenerate = "scoreboard/"
